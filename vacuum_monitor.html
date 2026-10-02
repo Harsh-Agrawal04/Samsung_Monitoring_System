@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CD-SEM Vacuum Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef1f5; --panel:#ffffff; --panel2:#f6f8fb; --ink:#13202f; --muted:#5d6b7c; --line:#d9e0e8;
+  --accent:#1c4fd6; --accent-ink:#ffffff; --bound:#d8321a; --oob:#5a2fd0;
+  --c1:#17803a; --c2:#b0267d; --c3:#c98a00;
+  --ok:#17803a; --warn:#b97400; --bad:#d8321a;
+  --shadow:0 1px 2px rgba(19,32,47,.06);
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c1118; --panel:#141b25; --panel2:#101720; --ink:#e6ebf2; --muted:#8c99ab; --line:#263243;
+    --accent:#7ea2ff; --accent-ink:#0c1118; --bound:#ff6a52; --oob:#a98cff;
+    --c1:#4fc873; --c2:#ee6cbd; --c3:#f3c03a; --ok:#4fc873; --warn:#f3b13a; --bad:#ff6a52;
+    --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c1118; --panel:#141b25; --panel2:#101720; --ink:#e6ebf2; --muted:#8c99ab; --line:#263243;
+  --accent:#7ea2ff; --accent-ink:#0c1118; --bound:#ff6a52; --oob:#a98cff;
+  --c1:#4fc873; --c2:#ee6cbd; --c3:#f3c03a; --ok:#4fc873; --warn:#f3b13a; --bad:#ff6a52;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--mono)}
+
+/* layout */
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);grid-template-rows:auto 1fr;min-height:100vh}
+.topbar{grid-column:1/-1;display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.brand svg{flex:none}
+.brand h1{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.brand p{margin:0;color:var(--muted);font-size:12px}
+.pick{display:flex;align-items:center;gap:6px}
+.pick label{color:var(--muted);font-size:13px}
+.pick select{padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);min-width:132px}
+.iconbtn{display:inline-grid;place-items:center;width:32px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.iconbtn:hover{border-color:var(--accent)}
+.demo{font-size:12px;color:var(--warn);border:1px dashed var(--warn);padding:3px 8px;border-radius:999px}
+
+.fleet{border-right:1px solid var(--line);background:var(--panel);padding:12px 10px;display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 58px);position:sticky;top:0;align-self:start}
+.fleet h2{margin:0;font-size:13px;font-weight:600}
+.fleet .sum{font-size:12px;color:var(--muted)}
+.fleet input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.fleet-list{overflow:auto;display:flex;flex-direction:column;gap:2px;margin:0 -4px;padding:0 4px}
+.fl{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid transparent;background:none;padding:6px 8px;border-radius:6px}
+.fl:hover{background:var(--panel2)}
+.fl[aria-current="true"]{background:var(--panel2);border-color:var(--accent)}
+.fl .dot{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.fl.ok .dot{background:var(--ok)} .fl.warn .dot{background:var(--warn)}
+.fl.alert .dot{background:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 25%,transparent)}
+.fl small{color:var(--muted);font-size:11.5px}
+.fl.alert small{color:var(--bad);font-weight:500}
+
+main{padding:14px 18px 40px;min-width:0}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tab{border:0;background:none;padding:9px 14px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--bad);color:#fff;font-size:11.5px;line-height:18px;text-align:center}
+[hidden]{display:none!important}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.grp-ctl{display:flex;align-items:center;gap:6px}
+.toolbar input[type=datetime-local],.field input,.field select,.field textarea,.inp{padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);color:var(--ink)}
+.toolbar input[type=datetime-local]{font-family:var(--mono);font-size:12.5px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg label{position:relative}
+.seg input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.seg span{display:block;padding:5px 10px;background:var(--panel2);border-right:1px solid var(--line);font-size:13px;white-space:nowrap}
+.seg label:last-child span{border-right:0}
+.seg input:checked+span{background:var(--accent);color:var(--accent-ink)}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:-2px}
+.seg .sw{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.btn{border:1px solid var(--line);background:var(--panel2);padding:5px 10px;border-radius:6px;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{padding:3px 8px;font-size:12px}
+.spacer{flex:1}
+.statusline{padding:8px 14px;color:var(--muted);font-size:12.5px;border-bottom:1px solid var(--line)}
+.chart-wrap{position:relative;padding:0}
+#chart{display:block;width:100%;height:clamp(320px,54vh,580px);cursor:grab;touch-action:pan-y;border-radius:0 0 8px 8px}
+#chart.dragging{cursor:grabbing}
+.tip{position:absolute;pointer-events:none;z-index:5;min-width:190px;max-width:260px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line);box-shadow:0 6px 20px rgba(0,0,0,.18);font-size:12.5px}
+.tip .tt{font-family:var(--mono);color:var(--muted);margin-bottom:4px}
+.tip .r{display:flex;align-items:baseline;gap:6px;padding:2px 0}
+.tip .r i{width:9px;height:9px;border-radius:50%;flex:none;align-self:center}
+.tip .r b{font-weight:500}
+.tip .r .v{margin-left:auto;font-family:var(--mono)}
+.tip .r.out{color:var(--oob);font-weight:600}
+.tip .sub{color:var(--muted);font-size:11.5px;padding-left:15px;font-family:var(--mono)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;padding:10px 14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:18px;height:0;border-top:3px solid}
+.legend i.dash{border-top:2px dashed var(--muted)}
+.legend i.blk{height:10px;width:14px;border:0;background:color-mix(in srgb,var(--oob) 45%,transparent);outline:2px solid var(--oob);outline-offset:-2px;border-radius:2px}
+.pins{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px;min-height:8px}
+.pin{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:var(--panel2);padding:3px 4px 3px 10px;border-radius:999px;font-size:12px;font-family:var(--mono)}
+.pin button{border:0;background:none;color:var(--muted);padding:0 6px;font-size:14px}
+.hint{color:var(--muted);font-size:12px;padding:0 14px 12px}
+
+.tgls{display:inline-flex;gap:6px;flex-wrap:wrap}
+.tgl{position:relative}
+.tgl input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0}
+.tgl span{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);font-size:13px;white-space:nowrap;color:var(--muted)}
+.tgl .sw{display:inline-block;width:9px;height:9px;border-radius:50%;border:2px solid var(--cc);background:transparent}
+.tgl input:checked+span{color:var(--ink);border-color:var(--cc);background:color-mix(in srgb,var(--cc) 14%,var(--panel2))}
+.tgl input:checked+span .sw{background:var(--cc)}
+.tgl input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.btn[aria-pressed="true"]{background:var(--warn);color:var(--accent-ink);border-color:var(--warn)}
+.note-actions{display:flex;gap:10px;margin-top:6px;align-items:center;font-size:12px;flex-wrap:wrap}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-size:12px;text-decoration:underline;text-underline-offset:2px}
+.linkbtn.danger{color:var(--bad)}
+.note.editing{border-left-color:var(--warn)}
+.note .confirm{color:var(--bad);font-weight:500}
+.edited{font-style:italic}
+.toast button{margin-left:14px;border:0;background:none;color:inherit;text-decoration:underline;font-weight:600;padding:0}
+.toast.show.act{pointer-events:auto}
+
+#fullBtn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.mutedl{color:var(--muted);font-size:13px}
+.bounds-list{display:grid;gap:10px}
+.brow{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;gap:8px;background:var(--panel2)}
+.bname{font-weight:600}
+.brow input[type=text]{padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+
+/* stats */
+.stats-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:1100px){.stats-grid{grid-template-columns:1fr}}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{font-weight:600;font-size:12.5px;color:var(--muted);background:var(--panel2);position:sticky;top:0}
+td.num,th.num{text-align:right;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+td small{display:block;color:var(--muted);font-weight:400;font-size:11.5px;font-family:var(--sans);white-space:normal}
+td.bad{color:var(--bad);font-weight:500}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;border:1px solid var(--line);font-family:var(--sans)}
+.pill.up{color:var(--bad);border-color:var(--bad)} .pill.flat{color:var(--ok);border-color:var(--ok)} .pill.down{color:var(--accent);border-color:var(--accent)}
+.card h3{margin:0;padding:12px 14px 4px;font-size:14px;font-weight:600}
+.card .sub{padding:0 14px 8px;color:var(--muted);font-size:12.5px;margin:0}
+canvas.plain{display:block;width:100%;height:290px}
+
+/* incidents */
+.sumrow{display:flex;gap:18px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);color:var(--muted);font-size:13px}
+.sumrow b{color:var(--ink);font-weight:600;font-family:var(--mono)}
+tr.grp td{background:var(--panel2);font-weight:500;cursor:pointer;border-top:1px solid var(--line)}
+tr.grp td small{display:inline;margin-left:8px}
+tr.row{cursor:pointer}
+tr.row:hover td{background:var(--panel2)}
+tr.row.open td{background:var(--panel2);border-bottom-color:transparent}
+tr.row td:first-child{border-left:3px solid transparent}
+tr.row.sev-Severe td:first-child{border-left-color:var(--bad)}
+tr.row.sev-Moderate td:first-child{border-left-color:var(--warn)}
+tr.row.sev-Minor td:first-child{border-left-color:var(--oob)}
+.sev{font-size:12px}
+.sev.Severe{color:var(--bad);font-weight:600}.sev.Moderate{color:var(--warn);font-weight:500}.sev.Minor{color:var(--oob)}
+.ongoing{color:var(--bad);font-weight:600}
+.notecount{font-size:12px;color:var(--muted)}
+.det{padding:6px 6px 16px}
+.det-head{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin-bottom:10px}
+.det-head code{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);padding:1px 6px;border-radius:4px}
+.det-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+@media (max-width:1000px){.det-grid{grid-template-columns:1fr}}
+canvas.mini{display:block;width:100%;height:250px;border:1px solid var(--line);border-radius:6px;background:var(--panel);touch-action:pan-y}
+.mini-read{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:20px;padding-top:6px}
+.det h4{margin:0 0 6px;font-size:13px}
+.notes-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:240px;overflow:auto}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:6px;padding:7px 10px;background:var(--panel)}
+.note .meta{color:var(--muted);font-size:11.5px;font-family:var(--mono)}
+.note p{margin:3px 0 0;white-space:pre-wrap}
+.note p b{font-weight:600}
+.note-form{display:grid;gap:6px}
+.note-form textarea{min-height:58px;resize:vertical;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.note-form input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.empty{padding:28px 14px;text-align:center;color:var(--muted)}
+.tablewrap{overflow-x:auto}
+
+/* dialog */
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);padding:0;width:min(560px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(5,10,18,.5)}
+.dlg-h{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.dlg-h h2{margin:0;font-size:16px;flex:1}
+.dlg-b{padding:14px 18px;display:grid;gap:12px;max-height:68vh;overflow:auto}
+.dlg-f{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+.field{display:grid;gap:4px}
+.field>label,.field>span.l{font-weight:500;font-size:13px}
+.field small{color:var(--muted);font-size:12px}
+.field .row{display:flex;gap:8px;align-items:center}
+.field .row input[type=text],.field .row input[type=number]{flex:1;min-width:0;font-family:var(--mono)}
+fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0;display:grid;gap:12px}
+legend{padding:0 6px;font-weight:600;font-size:13px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:50;opacity:0;pointer-events:none;transition:opacity .15s}
+.toast.show{opacity:1}
+
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .fleet{display:none}
+  main{padding:12px 10px 40px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 20 C10 20 11 9 15 9 S20 20 24 20" fill="none" stroke="var(--accent)" stroke-width="2"/><line x1="4" y1="12" x2="26" y2="12" stroke="var(--bound)" stroke-width="1.4" stroke-dasharray="3 2.5"/></svg>
+      <div><h1>CD-SEM vacuum monitor</h1><p>Chamber pressure across the tool fleet</p></div>
+    </div>
+    <div class="pick">
+      <button class="iconbtn" id="prevM" aria-label="Previous machine" title="Previous machine">‹</button>
+      <label for="machineSel">Machine</label>
+      <select id="machineSel"></select>
+      <button class="iconbtn" id="nextM" aria-label="Next machine" title="Next machine">›</button>
+    </div>
+    <span class="demo" title="Readings are generated in the browser. Swap FakeDataService for the SQLite adapter to go live.">Simulated data</span>
+  </header>
+
+  <aside class="fleet" aria-label="Machines">
+    <h2>All machines</h2>
+    <div class="sum" id="fleetSum">Scanning…</div>
+    <input id="fleetFilter" type="search" placeholder="Find machine number" aria-label="Find machine">
+    <div class="fleet-list" id="fleetList"></div>
+  </aside>
+
+  <main>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-graph" aria-selected="true" data-tab="graph">Pressure graph</button>
+      <button class="tab" role="tab" id="t-stats" aria-selected="false" data-tab="stats">Statistics</button>
+      <button class="tab" role="tab" id="t-inc" aria-selected="false" data-tab="inc">Incident reports<span class="badge" id="incBadge" hidden>0</span></button>
+    </div>
+
+    <!-- GRAPH -->
+    <section id="tab-graph" class="card" aria-labelledby="t-graph">
+      <div class="toolbar">
+        <div class="grp-ctl" role="group" aria-label="Date range">
+          <input type="datetime-local" id="fromIn" aria-label="Range start">
+          <span>to</span>
+          <input type="datetime-local" id="toIn" aria-label="Range end">
+        </div>
+        <div class="grp-ctl" role="group" aria-label="Quick ranges" id="quick">
+          <button class="btn small" data-days="1">1D</button>
+          <button class="btn small" data-days="3">3D</button>
+          <button class="btn small" data-days="7">7D</button>
+          <button class="btn small" data-days="14">14D</button>
+          <button class="btn small" data-days="30">30D</button>
+          <button class="btn small" data-days="45">45D</button>
+        </div>
+        <button class="btn" id="pauseBtn" aria-pressed="false" title="Lock the graph to the dates typed above. While paused you can still zoom in and pan, but only inside those dates.">Pause view</button>
+        <div class="grp-ctl">
+          <button class="iconbtn" id="panL" title="Pan left" aria-label="Pan left">◀</button>
+          <button class="iconbtn" id="panR" title="Pan right" aria-label="Pan right">▶</button>
+          <button class="iconbtn" id="zoomIn" title="Zoom in" aria-label="Zoom in">＋</button>
+          <button class="iconbtn" id="zoomOut" title="Zoom out" aria-label="Zoom out">－</button>
+          <button class="btn small" id="resetView" title="Back to the last 14 days">Reset</button>
+        </div>
+        <div class="tgls" role="group" aria-label="Chambers shown" id="chamberSeg"></div>
+        <div class="grp-ctl"><span class="mutedl">Bound lines</span><div class="tgls" role="group" aria-label="Bound lines shown" id="boundSeg"></div></div>
+        <span class="spacer"></span>
+        <button class="btn" id="fullBtn" aria-pressed="false" title="Show the sensor's full range, 10⁻⁵ to 100,000 Pa, instead of fitting the axis to the data">Full sensor range</button>
+        <button class="btn" id="boundChip" title="Change bounds"></button>
+        <button class="iconbtn" id="openSettings" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+      <div class="statusline" id="statusLine"></div>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="chart" tabindex="0" role="img" aria-label="Pressure over time. Drag to pan, scroll to zoom, click a point to pin it."></canvas>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="pins" id="pins"></div>
+      <div class="hint">Drag to pan. Scroll or pinch-scroll to zoom at the cursor. Click a point to pin its exact reading (up to 6). Arrow keys pan, + and − zoom, Esc clears pins. Pause view locks the graph to the dates you typed: you can still zoom in and pan, but only inside those dates. Unpaused, you can pan to any date in the 45-day history. Higher pressure is toward the top, so out-of-bounds excursions rise above the bound lines. The axis fits the data on screen. A bound line that is far from the data stays off the chart and is noted at the edge, so there is no empty space; it comes into view when readings approach it. Use Full sensor range to see the whole sensor span up to atmosphere (100,000 Pa).</div>
+    </section>
+
+    <!-- STATS -->
+    <section id="tab-stats" hidden aria-labelledby="t-stats">
+      <div class="card" style="margin-bottom:14px">
+        <div class="toolbar">
+          <div class="field" style="display:flex;gap:8px;align-items:center">
+            <label for="statsWin">Time window</label>
+            <select id="statsWin" class="inp">
+              <option value="view">Current graph range</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All retained data</option>
+            </select>
+          </div>
+          <span class="spacer"></span>
+          <span class="statusline" style="border:0;padding:0" id="statsInfo"></span>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="card"><div class="tablewrap"><table id="statsTable"></table></div></div>
+        <div class="card">
+          <h3>Daily median, long-term trend</h3>
+          <p class="sub">One point per day, so slow drift shows up before a bound is crossed.</p>
+          <canvas id="trend" class="plain"></canvas>
+          <div class="legend" id="trendLegend"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INCIDENTS -->
+    <section id="tab-inc" hidden aria-labelledby="t-inc" class="card">
+      <div class="toolbar">
+        <div class="seg" role="radiogroup" aria-label="Scope" id="incScope">
+          <label><input type="radio" name="incScope" value="machine" checked><span>This machine</span></label>
+          <label><input type="radio" name="incScope" value="all"><span>All machines</span></label>
+        </div>
+        <div class="grp-ctl"><label for="incChamber">Chamber</label>
+          <select id="incChamber" class="inp"></select></div>
+        <div class="grp-ctl">
+          <input type="datetime-local" id="incFrom" aria-label="Incidents from">
+          <span>to</span>
+          <input type="datetime-local" id="incTo" aria-label="Incidents to">
+        </div>
+        <label class="grp-ctl"><input type="checkbox" id="incGroup" checked> Group by time</label>
+        <span class="spacer"></span>
+        <button class="btn" id="copyCsv">Copy as CSV</button>
+      </div>
+      <div class="sumrow" id="incSum"></div>
+      <div class="tablewrap"><table id="incTable"></table></div>
+      <div style="padding:10px;text-align:center"><button class="btn" id="incMore" hidden>Show more</button></div>
+    </section>
+  </main>
+</div>
+
+<!-- SETTINGS -->
+<dialog id="settings" aria-labelledby="setTitle">
+  <div class="dlg-h"><h2 id="setTitle">Settings</h2><button class="iconbtn" id="setClose" aria-label="Close">✕</button></div>
+  <div class="dlg-b">
+    <fieldset>
+      <legend>Units and bounds</legend>
+      <div class="field">
+        <label for="sUnit">Units</label>
+        <select id="sUnit"><option>Pa</option><option>kPa</option><option>Torr</option><option>mTorr</option></select>
+      </div>
+      <div id="sBounds" class="bounds-list"></div>
+      <small>Out of bounds means pressure above the upper bound. The optional lower bound also flags readings that are suspiciously low. Scientific notation works, for example 6e-3.</small>
+    </fieldset>
+    <fieldset>
+      <legend>Graph</legend>
+      <div class="field"><label for="sScale">Pressure axis</label>
+        <select id="sScale"><option value="log">Logarithmic (recommended)</option><option value="linear">Linear</option></select></div>
+      <div class="field"><label for="sYMode">Pressure axis range</label>
+        <select id="sYMode">
+          <option value="fit">Fit to the data, tight (default)</option>
+          <option value="fitall">Fit to the data and every bound line</option>
+          <option value="focus">Fixed operating and out-of-bounds window</option>
+          <option value="full">Full sensor range (10⁻⁵ to 100,000 Pa)</option>
+          <option value="custom">Custom limits (set below)</option>
+        </select>
+        <div class="row"><span>From</span><input type="text" id="sYMin" inputmode="decimal" aria-label="Axis minimum"><span>to</span><input type="text" id="sYMax" inputmode="decimal" aria-label="Axis maximum"><span class="mono unitl">Pa</span></div>
+        <small>Tight fit keeps a bound line off the chart until the data gets within a decade of it, so there is no empty space. Custom limits: enter the lowest and highest pressure to show. Typing here switches the range to Custom. Higher pressure is toward the top.</small></div>
+      <div class="field"><label for="sAgg">Value shown when readings are combined</label>
+        <select id="sAgg"><option value="avg">Average</option><option value="max">Maximum</option><option value="min">Minimum</option></select></div>
+      <div class="field"><label class="row"><input type="checkbox" id="sSpikes"> Always show excursions at their true peak</label>
+        <small>Keeps short spikes visible when zoomed out, even in average mode.</small></div>
+      <div class="field"><label for="sRes">Smallest time step</label>
+        <select id="sRes"><option value="auto">Automatic (finest the zoom allows)</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="360">6 hours</option><option value="1440">1 day</option></select></div>
+      <div class="field"><label for="sSig">Significant digits shown</label>
+        <input type="number" id="sSig" min="1" max="6" step="1"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Incidents</legend>
+      <div class="field"><label for="sGroup">Group incidents that start within this many minutes of each other</label>
+        <input type="number" id="sGroup" min="1" max="1440" step="1"></div>
+    </fieldset>
+  </div>
+  <div class="dlg-f">
+    <button class="btn" id="setReset">Restore defaults</button>
+    <span class="spacer"></span>
+    <button class="btn" id="setCancel">Cancel</button>
+    <button class="btn primary" id="setApply">Apply</button>
+  </div>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   CONFIG
+   ===================================================================== */
+const CONFIG = {
+  MACHINE_COUNT: 40,     // replicate up to 40 machines
+  CHAMBERS: 3,           // specimen chamber + two load chambers
+  CHAMBER_NAMES: ['Specimen chamber', 'Load chamber 1', 'Load chamber 2'],   // edit to match the labels on the tool
+  CHAMBER_SHORT: ['SC', 'LC1', 'LC2'],
+  SAMPLE_MS: 60000,      // one reading per minute, per the meeting notes
+  RETENTION_DAYS: 45,    // "keep all data for 45 days"
+  DEFAULT_RANGE_DAYS: 14,
+  INVERT_Y: false,       // false: higher pressure (out of bounds) at the top. true: flip so vacuum is at the top
+  SIMULATE_PUMPDOWN: false,  // true adds pump-downs from atmosphere (100,000 Pa) to the fake data
+  FOCUS_MIN_PA: 1e-5,    // default axis: from here...
+  FOCUS_HEADROOM: 10,    // ...up to this many times the highest upper bound (operating range plus the out-of-bounds zone)
+  SENSOR_MIN_PA: 1e-5,   // sensor range from the design report (Table 3)
+  SENSOR_MAX_PA: 1e5
+};
+/* Every pressure in the data layer is in pascals. f converts Pa to the unit shown on screen. */
+const UNITS = {
+  Pa:{f:1}, kPa:{f:0.001}, Torr:{f:1/133.322368}, mTorr:{f:1000/133.322368}
+};
+const DEFAULT_SETTINGS = {
+  unit:'Pa',
+  // upper bounds from the design report (Table 1): specimen chamber 6e-3 Pa, loading chambers 1e-2 Pa
+  bounds:{
+    1:{ upperPa:6e-3, lowerOn:false, lowerPa:1e-5 },
+    2:{ upperPa:1e-2, lowerOn:false, lowerPa:1e-5 },
+    3:{ upperPa:1e-2, lowerOn:false, lowerPa:1e-5 }
+  },
+  showBound:{ 1:true, 2:true, 3:true },
+  yMode:'fit', yMinPa:1e-5, yMaxPa:1e5,
+  scale:'log', agg:'avg', keepSpikes:true, resolution:'auto', sig:3, groupWindowMin:30
+};
+const defaultSettings = () => JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+
+/* =====================================================================
+   HELPERS
+   ===================================================================== */
+const $  = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+const pad2 = n => String(n).padStart(2,'0');
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const SUP = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻'};
+const sup = n => String(n).split('').map(c => SUP[c] || c).join('');
+const chName = c => CONFIG.CHAMBER_NAMES[c-1] || ('Chamber ' + c);
+const chShort = c => CONFIG.CHAMBER_SHORT[c-1] || ('C' + c);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtNum(v, sig=3, trim=false){
+  if(!isFinite(v)) return '–';
+  if(v === 0) return '0';
+  const a = Math.abs(v);
+  if(a >= 0.01 && a < 10000){
+    let s = v.toPrecision(sig);
+    if(s.includes('e')) s = String(+s);
+    if(trim && s.includes('.')) s = s.replace(/0+$/,'').replace(/\.$/,'');
+    return s;
+  }
+  let e = Math.floor(Math.log10(a));
+  let ms = (v / Math.pow(10,e)).toFixed(sig-1);
+  if(Math.abs(+ms) >= 10){ e += 1; ms = (v / Math.pow(10,e)).toFixed(sig-1); }
+  if(trim && ms.includes('.')) ms = ms.replace(/0+$/,'').replace(/\.$/,'');
+  return ms + '×10' + sup(e);
+}
+const fmtDT = t => { const d = new Date(t); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const fmtMDHM = t => { const d = new Date(t); return `${d.getMonth()+1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const fmtHM = t => { const d = new Date(t); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const fmtMD = t => { const d = new Date(t); return `${d.getMonth()+1}/${d.getDate()}`; };
+const fmtDateLong = t => { const d = new Date(t); return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`; };
+const toLocalInput = t => fmtDT(t).replace(' ','T');
+function fmtDur(ms){
+  const m = Math.round(ms/60000);
+  if(m < 1) return '<1m';
+  const d = Math.floor(m/1440), h = Math.floor(m%1440/60), mm = m%60;
+  if(d) return `${d}d ${h}h`;
+  if(h) return `${h}h ${mm}m`;
+  return `${mm}m`;
+}
+function mulberry32(a){
+  return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a>>>15, 1|a);
+    t = t + Math.imul(t ^ t>>>7, 61|t) ^ t; return ((t ^ t>>>14)>>>0) / 4294967296; };
+}
+function toast(msg, action, ms){
+  const el = $('#toast'); el.textContent = msg; el.classList.toggle('act', !!action);
+  if(action){
+    const b = document.createElement('button'); b.textContent = action.label;
+    b.onclick = () => { clearTimeout(toast._t); el.classList.remove('show'); action.fn(); };
+    el.appendChild(b);
+  }
+  el.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), ms || 2200);
+}
+function hexA(hex, a){
+  const h = hex.replace('#',''); const n = parseInt(h.length===3 ? h.split('').map(c=>c+c).join('') : h, 16);
+  return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;
+}
+
+/* =====================================================================
+   DATA SERVICE CONTRACT
+   Everything the UI needs from a backend goes through the `api` object.
+   All methods return Promises so the UI never assumes data is local.
+
+     getBuckets(machine, chamber, startMs, endMs, bucketMin)
+         -> { t:Float64Array, avg:Float32Array, min:Float32Array, max:Float32Array, k }
+         SQLite: SELECT (ts/:bucket)*:bucket AS t, AVG(p), MIN(p), MAX(p)
+                 FROM readings WHERE machine_id=? AND chamber=? AND ts BETWEEN ? AND ?
+                 GROUP BY 1 ORDER BY 1
+     getIncidents({machine|null, chamber|null, start, end, bounds}) -> Incident[]
+         SQLite: gaps-and-islands over readings, or a stored incidents table
+     getStats(machine, chamber, start, end, bounds) -> stats object
+         SQLite has no MEDIAN/PERCENTILE; use ORDER BY p LIMIT 1 OFFSET n/2 or compute in the API layer
+     getDailyMedians(machine, chamber, start, end) -> [{t, median}]
+     getFleetStatus(machine, bounds) -> {incidents24h, oobNow, total}
+     bounds = { 1:{upper, lower}, 2:{upper, lower}, 3:{upper, lower} }, keyed by chamber, in pascals; lower is 0 when no lower bound is set.
+     Every pressure the data service returns or accepts is in pascals.
+     getNotes(incidentId) / getNoteCounts(ids) / addNote(incidentId, note)
+     updateNote(incidentId, noteId, {author, occurred, fix}) / deleteNote(incidentId, noteId) / restoreNote(incidentId, noteId)
+         deleteNote is a soft delete (sets deleted_ts) so the Undo button can call restoreNote; purge old deleted rows server-side if you like
+
+   Suggested SQLite schema:
+     CREATE TABLE readings (machine_id INTEGER, chamber INTEGER, ts INTEGER, pressure_pa REAL,
+                            PRIMARY KEY (machine_id, chamber, ts)) WITHOUT ROWID;
+     CREATE TABLE incident_notes (id INTEGER PRIMARY KEY, incident_id TEXT, author TEXT,
+                            occurred TEXT, fix TEXT, created_ts INTEGER, edited_ts INTEGER, deleted_ts INTEGER);
+     CREATE INDEX idx_notes_incident ON incident_notes(incident_id);
+   Incident ids look like M03-SC-1001-1402 (machine, chamber, local MMDD-HHmm of the first out-of-bounds reading).
+   ===================================================================== */
+
+const FakeDataService = (() => {
+  const N = CONFIG.RETENTION_DAYS * 1440, STEP = CONFIG.SAMPLE_MS;
+  const T_END = Math.floor(Date.now()/STEP) * STEP, T0 = T_END - (N-1)*STEP;
+  const store = new Map(), incCache = new Map();
+  const REF_BOUND = [6e-3, 1e-2, 1e-2];                                        // only shapes the simulated excursions
+  const BASE_RANGE = [[2.0e-5, 4.0e-5], [1.0e-4, 3.0e-4], [1.0e-4, 3.0e-4]];   // normal operating pressure, Pa
+  const noise = r => (r()+r()+r()-1.5) * 2;
+
+  const GLOBAL = (() => { const r = mulberry32(424242);
+    return Array.from({length:6}, () => ({ s:Math.floor(r()*(N-300)), d:25+Math.floor(r()*120), mult:2+r()*20, seed:Math.floor(r()*1e9) })); })();
+  const gHit = (m,e) => mulberry32(m*7919 + e.seed)() < 0.22;
+
+  function addEvent(L, s, d, h){
+    const e = Math.min(N, s+d), up = Math.max(2, d*0.25|0), dn = Math.max(2, d*0.35|0);
+    for(let i=s; i<e; i++){
+      const a = i-s, b = e-1-i; let w = 1;
+      if(a < up){ const x = a/up; w = x*x*(3-2*x); }
+      if(b < dn){ const x = b/dn; w = Math.min(w, x*x*(3-2*x)); }
+      L[i] += h*w;
+    }
+  }
+  function gen(m){
+    const rm = mulberry32(m*104729 + 11), mw = [];
+    const n = 1 + Math.floor(rm()*3);
+    for(let k=0;k<n;k++) mw.push({ s:Math.floor(rm()*(N-400)), d:20+Math.floor(rm()*150), mult:1.5+rm()*12 });
+    const out = [];
+    for(let c=0;c<CONFIG.CHAMBERS;c++){
+      const r = mulberry32(m*131071 + c*8191 + 7);
+      const [bLo, bHi] = BASE_RANGE[c] || BASE_RANGE[1], refB = REF_BOUND[c] || REF_BOUND[1];
+      const base = Math.log10(bLo + r()*(bHi-bLo));       // log10 of the normal pressure in Pa
+      const L = new Float32Array(N);                        // work in log10(Pa), convert at the end
+      const p1 = r()*6.283, p2 = r()*6.283, per1 = (0.8+r()*1.5)*1440, per2 = (5+r()*5)*1440;
+      let ar = 0;
+      for(let i=0;i<N;i++){
+        ar = 0.97*ar + 0.010*noise(r);
+        L[i] = base + 0.03*Math.sin(6.2832*i/per1 + p1) + 0.04*Math.sin(6.2832*i/per2 + p2) + ar + 0.008*noise(r);
+      }
+      const ev = (s,d,mult) => addEvent(L, clamp(s,0,N-2), d, Math.log10(refB*mult) - base);
+      const ne = 2 + Math.floor(r()*5);
+      for(let k=0;k<ne;k++) ev(Math.floor(r()*(N-300)), 8 + Math.floor(r()*r()*240), 1.25 + r()*r()*30);
+      for(const e of mw) ev(e.s + c*2, Math.max(6, e.d + Math.floor((r()-0.5)*20)), e.mult*(0.8+r()*0.4));
+      for(const e of GLOBAL) if(gHit(m,e)) ev(e.s + c, e.d, e.mult*(0.8+r()*0.4));
+      if(m % 13 === 7 && c === m % 3){            // slow leak that ends up above the bound and stays there
+        const start = (10 + m % 20) * 1440, amp = Math.log10(refB) - base + 0.6;
+        for(let i=start;i<N;i++) L[i] += amp * Math.min(1, (i-start)/(6*1440));
+      }
+      { const cap = Math.log10(refB*40); for(let i=0;i<N;i++) if(L[i] > cap) L[i] = cap; }   // keep stacked fake events realistic
+      if(CONFIG.SIMULATE_PUMPDOWN && m % 11 === 2){   // pump-down from atmosphere (100,000 Pa) at the start of the window
+        const T = 300 + c*120, top = 5 - base;
+        for(let i=0;i<T;i++){ const x = 1 - i/T; L[i] += top*x*x; }
+      }
+      for(let i=0;i<N;i++) L[i] = Math.pow(10, L[i]);
+      out.push(L);
+    }
+    return out;
+  }
+  const ensure = m => { if(!store.has(m)) store.set(m, gen(m)); return store.get(m); };
+
+  const sevOf = ratio => ratio < 2 ? 'Minor' : ratio < 10 ? 'Moderate' : 'Severe';  // placeholder thresholds
+  function mkInc(m,c,s,e,peak,pi,ratio,side){
+    const start = T0 + s*STEP, end = e == null ? null : T0 + e*STEP;
+    const d = new Date(start);
+    return { id:`M${pad2(m)}-${chShort(c)}-${pad2(d.getMonth()+1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}`,
+      machine:m, chamber:c, start, end, ongoing:end == null,
+      durationMs:(end == null ? T_END + STEP : end) - start,
+      peak, peakT:T0 + pi*STEP, side, ratio, severity:sevOf(ratio) };
+  }
+  function detect(m, B){
+    const key = JSON.stringify(B), hit = incCache.get(m);
+    if(hit && hit.key === key) return hit.list;
+    const data = ensure(m), list = [];
+    for(let c=0;c<data.length;c++){
+      const a = data[c], upper = B[c+1].upper, lower = B[c+1].lower || 0;
+      let run=false, s=0, best=0, bestV=0, bestI=0, side='high';
+      for(let i=0;i<=N;i++){
+        let oob = false, sc = 0, sd = 'high';
+        if(i < N){ const v = a[i];
+          if(v > upper){ oob = true; sc = v/upper; }
+          else if(lower > 0 && v < lower){ oob = true; sc = lower/v; sd = 'low'; } }
+        if(oob){
+          if(!run){ run = true; s = i; best = 0; }
+          if(sc > best){ best = sc; bestV = a[i]; bestI = i; side = sd; }
+        } else if(run){
+          run = false; list.push(mkInc(m, c+1, s, i < N ? i : null, bestV, bestI, best, side));
+        }
+      }
+    }
+    list.sort((x,y) => y.start - x.start);
+    incCache.set(m, { key, list });
+    return list;
+  }
+
+  /* notes (localStorage when available, memory otherwise) */
+  const NOTES_KEY = 'cdsem.notes.v1'; let notes = {};
+  try{ notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') || {}; }catch(e){ notes = {}; }
+  const saveNotes = () => { try{ localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); }catch(e){} };
+  const newNid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  Object.values(notes).forEach(l => l.forEach(n => { if(!n.nid) n.nid = newNid(); }));
+  const liveNotes = id => (notes[id] || []).filter(n => !n.deletedTs);
+  const findNote = (id, nid) => (notes[id] || []).find(n => n.nid === nid);
+
+  const med = sorted => sorted[Math.floor((sorted.length-1)/2)];
+  return {
+    retention:{ start:T0, end:T_END },
+    warm(m){ ensure(m); },
+
+    async getBuckets(m, c, start, end, k){
+      const a = ensure(m)[c-1];
+      const i0 = clamp(Math.ceil((start-T0)/STEP), 0, N-1), i1 = clamp(Math.floor((end-T0)/STEP), 0, N-1);
+      const b0 = Math.floor(i0/k), b1 = Math.floor(i1/k), nb = Math.max(0, b1-b0+1);
+      const t = new Float64Array(nb), avg = new Float32Array(nb), mn = new Float32Array(nb), mx = new Float32Array(nb);
+      for(let b=0;b<nb;b++){
+        const s = (b0+b)*k, e = Math.min(N, s+k); let sum=0, lo=Infinity, hi=-Infinity;
+        for(let i=s;i<e;i++){ const v = a[i]; sum += v; if(v<lo) lo=v; if(v>hi) hi=v; }
+        t[b] = T0 + s*STEP; avg[b] = sum/(e-s); mn[b] = lo; mx[b] = hi;
+      }
+      return { t, avg, min:mn, max:mx, k };
+    },
+
+    async getIncidents({machine, chamber, start, end, bounds}){
+      const ms = machine ? [machine] : Array.from({length:CONFIG.MACHINE_COUNT}, (_,i) => i+1);
+      const out = [];
+      for(const m of ms) for(const inc of detect(m, bounds)){
+        if(chamber && inc.chamber !== chamber) continue;
+        if(inc.start <= end && (inc.end == null ? T_END : inc.end) >= start) out.push(inc);
+      }
+      return out.sort((x,y) => y.start - x.start);
+    },
+
+    async getFleetStatus(m, bounds){
+      const list = detect(m, bounds), cutoff = T_END - 86400000;
+      let n24 = 0, now = false;
+      for(const i of list){ if(i.ongoing) now = true; if((i.end == null ? T_END : i.end) >= cutoff) n24++; }
+      return { incidents24h:n24, oobNow:now, total:list.length };
+    },
+
+    async getStats(m, c, start, end, bounds){
+      const a = ensure(m)[c-1], upper = bounds[c].upper, lower = bounds[c].lower || 0;
+      const i0 = clamp(Math.ceil((start-T0)/STEP), 0, N-1), i1 = clamp(Math.floor((end-T0)/STEP), i0, N-1);
+      const n = i1-i0+1, sl = a.subarray(i0, i1+1), sorted = Float32Array.from(sl).sort();
+      let sum=0, mn=Infinity, mx=-Infinity, mnI=0, mxI=0, oob=0, sx=0, sy=0, sxx=0, sxy=0;
+      for(let j=0;j<n;j++){
+        const v = sl[j]; sum += v;
+        if(v<mn){ mn=v; mnI=j; } if(v>mx){ mx=v; mxI=j; }
+        if(v > upper || (lower > 0 && v < lower)) oob++;
+        const x = j/1440, y = Math.log10(v); sx+=x; sy+=y; sxx+=x*x; sxy+=x*y;
+      }
+      const mean = sum/n; let vs = 0; for(let j=0;j<n;j++){ const d = sl[j]-mean; vs += d*d; }
+      const sd = Math.sqrt(vs/Math.max(1,n-1)), q = p => sorted[Math.min(n-1, Math.floor(p*(n-1)))];
+      const den = n*sxx - sx*sx, slope = den ? (n*sxy - sx*sy)/den : 0;
+      const winMs = n*STEP; let count = 0, down = 0, longest = 0;
+      for(const inc of detect(m, bounds)){
+        if(inc.chamber !== c) continue;
+        const ie = inc.end == null ? T_END + STEP : inc.end, s = Math.max(inc.start, start), e = Math.min(ie, end + STEP);
+        if(e > s){ count++; down += e-s; longest = Math.max(longest, ie-inc.start); }
+      }
+      return { n, median:med(sorted), mean, min:mn, minT:T0+(i0+mnI)*STEP, max:mx, maxT:T0+(i0+mxI)*STEP,
+        sd, cv:sd/mean, p5:q(.05), p25:q(.25), p75:q(.75), p95:q(.95), p99:q(.99),
+        pctOob:100*oob/n, count, down, longest, mtbi:count ? winMs/count : null,
+        slope, latest:a[N-1] };
+    },
+
+    async getDailyMedians(m, c, start, end){
+      const a = ensure(m)[c-1], out = [];
+      for(let b=0;b*1440<N;b++){
+        const s = b*1440, e = Math.min(N, s+1440), t = T0 + s*STEP;
+        if(t + 1440*STEP < start || t > end) continue;
+        out.push({ t:t + 720*STEP, median:med(Float32Array.from(a.subarray(s,e)).sort()) });
+      }
+      return out;
+    },
+
+    async getNotes(id){ return liveNotes(id).map(n => ({ ...n })); },
+    async getNoteCounts(ids){ const o = {}; ids.forEach(i => o[i] = liveNotes(i).length); return o; },
+    async addNote(id, note){ (notes[id] = notes[id] || []).push({ ...note, nid:newNid(), ts:Date.now() }); saveNotes(); },
+    async updateNote(id, nid, patch){ const n = findNote(id, nid); if(!n) return; n.author = patch.author; n.occurred = patch.occurred; n.fix = patch.fix; n.editedTs = Date.now(); saveNotes(); },
+    async deleteNote(id, nid){ const n = findNote(id, nid); if(n){ n.deletedTs = Date.now(); saveNotes(); } },
+    async restoreNote(id, nid){ const n = findNote(id, nid); if(n){ delete n.deletedTs; saveNotes(); } }
+  };
+})();
+
+/* Drop-in for the real thing: same methods, served by your SQLite-backed API.
+   Flip USE_BACKEND to true once endpoints exist. */
+const HttpDataService = (() => {
+  const base = '/api';
+  const j = async (path, opts) => { const r = await fetch(base + path, opts); if(!r.ok) throw new Error(path + ' ' + r.status); return r.json(); };
+  const q = o => new URLSearchParams(o).toString();
+  return {
+    retention:FakeDataService.retention,   // replace with GET /api/retention
+    warm(){},
+    async getBuckets(m,c,s,e,k){ const d = await j(`/readings/buckets?${q({machine:m,chamber:c,start:s,end:e,bucketMin:k})}`);
+      return { t:Float64Array.from(d.t), avg:Float32Array.from(d.avg), min:Float32Array.from(d.min), max:Float32Array.from(d.max), k }; },
+    getIncidents:o => j(`/incidents?${q({ ...o, bounds:JSON.stringify(o.bounds) })}`),
+    getFleetStatus:(m,b) => j(`/fleet/${m}/status?${q({bounds:JSON.stringify(b)})}`),
+    getStats:(m,c,s,e,b) => j(`/stats?${q({machine:m,chamber:c,start:s,end:e,bounds:JSON.stringify(b)})}`),
+    getDailyMedians:(m,c,s,e) => j(`/stats/daily-median?${q({machine:m,chamber:c,start:s,end:e})}`),
+    getNotes:id => j(`/incidents/${encodeURIComponent(id)}/notes`),
+    getNoteCounts:ids => j(`/incidents/note-counts?${q({ids:ids.join(',')})}`),
+    addNote:(id,n) => j(`/incidents/${encodeURIComponent(id)}/notes`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(n) }),
+    updateNote:(id,nid,n) => j(`/incidents/${encodeURIComponent(id)}/notes/${encodeURIComponent(nid)}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(n) }),
+    deleteNote:(id,nid) => j(`/incidents/${encodeURIComponent(id)}/notes/${encodeURIComponent(nid)}`, { method:'DELETE' }),
+    restoreNote:(id,nid) => j(`/incidents/${encodeURIComponent(id)}/notes/${encodeURIComponent(nid)}/restore`, { method:'POST' })
+  };
+})();
+
+const USE_BACKEND = false;
+const api = USE_BACKEND ? HttpDataService : FakeDataService;
+const RET = api.retention, STEP = CONFIG.SAMPLE_MS;
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+const SETTINGS_KEY = 'cdsem.settings.v4';
+function loadSettings(){
+  const d = defaultSettings();
+  try{
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    return { ...d, ...s, bounds:{ ...d.bounds, ...(s.bounds || {}) }, showBound:{ ...d.showBound, ...(s.showBound || {}) } };
+  }catch(e){ return d; }
+}
+const state = {
+  machine:1, tab:'graph', chOn:[1,2,3], paused:false, pauseWin:null,
+  range:{ start:RET.end - CONFIG.DEFAULT_RANGE_DAYS*86400000, end:RET.end },
+  settings:loadSettings(),
+  series:{}, plot:{}, k:1, pins:[],
+  statsWin:'view',
+  incScope:'machine', incChamber:'all', incGroup:true, incFrom:RET.start, incTo:RET.end,
+  incidents:[], incMap:new Map(), openInc:new Set(), collapsed:new Set(), incShown:60
+};
+/* bounds are stored per chamber in pascals; lower is 0 when the lower bound is switched off */
+const boundsFor = c => {
+  const b = state.settings.bounds[c] || state.settings.bounds[1];
+  return { upper:b.upperPa, lower:b.lowerOn ? b.lowerPa : 0 };
+};
+const allBounds = () => { const o = {}; chambers().forEach(c => o[c] = boundsFor(c)); return o; };
+const unitF = () => UNITS[state.settings.unit].f;
+const chambers = () => Array.from({length:CONFIG.CHAMBERS}, (_,i) => i+1);
+const visibleChambers = () => chambers().filter(c => state.chOn.includes(c));
+state.chOn = chambers();
+
+function colors(){
+  const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
+  return { ink:g('--ink'), muted:g('--muted'), line:g('--line'), panel:g('--panel'), panel2:g('--panel2'),
+    bound:g('--bound'), oob:g('--oob'), accent:g('--accent'), ch:[g('--c1'),g('--c2'),g('--c3'),g('--accent')] };
+}
+function fitCanvas(cv){
+  const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(10, Math.round(r.width)), h = Math.max(10, Math.round(r.height));
+  if(cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  return { ctx, w, h };
+}
+
+/* =====================================================================
+   SHARED CHART HELPERS
+   ===================================================================== */
+const MONO = '11px "IBM Plex Mono", ui-monospace, monospace';
+function niceStep(raw){
+  const p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw/p;
+  return (m<=1 ? 1 : m<=2 ? 2 : m<=5 ? 5 : 10) * p;
+}
+function yDomain(lo, hi, scale){
+  if(scale === 'log'){
+    lo = Math.log10(Math.max(lo,1e-30)) - 0.2; hi = Math.log10(Math.max(hi,1e-30)) + 0.25;
+    if(hi-lo < 0.8){ const c = (hi+lo)/2; lo = c-0.4; hi = c+0.4; }
+    return { lo, hi };
+  }
+  const pad = (hi-lo)*0.08 || hi*0.1 || 1;
+  return { lo:Math.max(0, lo-pad), hi:hi+pad };
+}
+/* Axis range: fit to the data, the sensor's full range, or a custom range. Values are in display units. */
+function axisDomain(lo, hi, forceFit){
+  const st = state.settings, f = unitF();
+  if(!forceFit && st.yMode === 'focus'){
+    // stable window: normal operating pressure up to a little above the highest bound, so panning and zooming never rescale it
+    const a = CONFIG.FOCUS_MIN_PA * f, b = Math.max(...chambers().map(c => boundsFor(c).upper)) * CONFIG.FOCUS_HEADROOM * f;
+    return st.scale === 'log' ? { lo:Math.log10(a), hi:Math.log10(b) } : { lo:a, hi:b };
+  }
+  if(!forceFit && (st.yMode === 'full' || st.yMode === 'custom')){
+    const a = (st.yMode === 'full' ? CONFIG.SENSOR_MIN_PA : st.yMinPa) * f, b = (st.yMode === 'full' ? CONFIG.SENSOR_MAX_PA : st.yMaxPa) * f;
+    return st.scale === 'log' ? { lo:Math.log10(a), hi:Math.log10(b) } : { lo:a, hi:b };
+  }
+  return yDomain(lo, hi, st.scale);
+}
+/* Fit mode: a bound line only widens the axis when the data comes within a decade of it (half its value on a linear axis),
+   so a distant bound doesn't leave a band of empty space. Lines left out are noted at the edge of the chart instead. */
+function fitWithBounds(lo, hi, items){
+  const near = state.settings.yMode === 'fitall' ? 0 : state.settings.scale === 'log' ? 0.1 : 0.5;   // fitall: always include every bound line
+  for(const it of items){
+    if(!isFinite(hi) || hi >= it.upperD * near){ lo = Math.min(lo, it.upperD); hi = Math.max(hi, it.upperD); }
+    if(it.lowerD > 0 && (!isFinite(lo) || near === 0 || lo <= it.lowerD / near)){ lo = Math.min(lo, it.lowerD); hi = Math.max(hi, it.lowerD); }
+  }
+  return { lo, hi };
+}
+function yTicks(yd, scale){
+  const out = [];
+  if(scale === 'log'){
+    const span = yd.hi - yd.lo;
+    for(let e=Math.floor(yd.lo); e<=Math.ceil(yd.hi); e++){
+      for(let m=1;m<=9;m++){
+        const v = m*Math.pow(10,e), gv = Math.log10(v);
+        if(gv < yd.lo || gv > yd.hi) continue;
+        const major = m === 1;
+        if(!major && span > 5) continue;
+        out.push({ v, g:gv, label:(major || (span < 2.2 && (m===2 || m===5))) ? fmtNum(v,1,true) : null, major });
+      }
+    }
+  } else {
+    const step = niceStep((yd.hi-yd.lo)/6);
+    for(let v=Math.ceil(yd.lo/step)*step; v<=yd.hi+1e-12; v+=step) out.push({ v, g:v, label:fmtNum(v, 3, true), major:true });
+  }
+  return out;
+}
+const T_STEPS = [60e3,120e3,300e3,600e3,900e3,1800e3,3600e3,7200e3,10800e3,21600e3,43200e3,86400e3,172800e3,604800e3];
+function xTicks(t0, t1, pw){
+  const want = Math.max(2, pw/95), span = t1-t0;
+  const step = T_STEPS.find(s => span/s <= want) || T_STEPS[T_STEPS.length-1], out = [];
+  if(step >= 86400e3){
+    const d = new Date(t0); d.setHours(0,0,0,0); if(d.getTime() < t0) d.setDate(d.getDate()+1);
+    const days = Math.round(step/86400e3);
+    while(d.getTime() <= t1){ out.push({ t:d.getTime(), label:fmtMD(d.getTime()), sub:null }); d.setDate(d.getDate()+days); }
+  } else {
+    const off = new Date(t0).getTimezoneOffset()*60000;
+    let t = Math.ceil((t0-off)/step)*step + off, prevDay = null;
+    for(; t<=t1; t+=step){
+      const day = fmtMD(t), first = prevDay === null || day !== prevDay;
+      out.push({ t, label:fmtHM(t), sub:first ? day : null }); prevDay = day;
+    }
+  }
+  return out;
+}
+function drawFrame(ctx, W, H, M, t0, t1, yd, scale, col, unitLabel){
+  const pw = W-M.l-M.r, ph = H-M.t-M.b;
+  const g = scale === 'log' ? (v => Math.log10(Math.max(v,1e-30))) : (v => v);
+  const X = t => M.l + (t-t0)/(t1-t0)*pw;
+  const Y = v => { const fr = (g(v)-yd.lo)/(yd.hi-yd.lo); return M.t + (CONFIG.INVERT_Y ? fr : 1-fr)*ph; };
+  ctx.clearRect(0,0,W,H); ctx.fillStyle = col.panel; ctx.fillRect(0,0,W,H);
+  ctx.font = MONO; ctx.textBaseline = 'middle';
+  for(const tk of yTicks(yd, scale)){
+    const fy = (tk.g-yd.lo)/(yd.hi-yd.lo), y = M.t + (CONFIG.INVERT_Y ? fy : 1-fy)*ph;
+    ctx.strokeStyle = tk.major ? col.line : hexA(col.line.length === 7 ? col.line : '#888888', .45);
+    ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(M.l, Math.round(y)+.5); ctx.lineTo(W-M.r, Math.round(y)+.5); ctx.stroke();
+    if(tk.label){ ctx.fillStyle = col.muted; ctx.textAlign = 'right'; ctx.fillText(tk.label, M.l-8, y); }
+  }
+  ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+  for(const tk of xTicks(t0, t1, pw)){
+    const x = X(tk.t);
+    if(x < M.l-1 || x > W-M.r+1) continue;
+    ctx.strokeStyle = col.line; ctx.beginPath(); ctx.moveTo(Math.round(x)+.5, M.t); ctx.lineTo(Math.round(x)+.5, M.t+ph); ctx.stroke();
+    ctx.fillStyle = col.muted; ctx.fillText(tk.label, x, M.t+ph+6);
+    if(tk.sub){ ctx.fillStyle = col.ink; ctx.fillText(tk.sub, x, M.t+ph+19); }
+  }
+  ctx.strokeStyle = col.muted; ctx.lineWidth = 1; ctx.beginPath();
+  ctx.moveTo(M.l+.5, M.t); ctx.lineTo(M.l+.5, M.t+ph); ctx.lineTo(W-M.r, M.t+ph+.5); ctx.stroke();
+  ctx.save(); ctx.translate(14, M.t+ph/2); ctx.rotate(-Math.PI/2); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = col.muted; ctx.font = '12px "IBM Plex Sans", system-ui, sans-serif'; ctx.fillText(`Pressure (${unitLabel})`, 0, 0); ctx.restore();
+  ctx.font = MONO;
+  return { X, Y, pw, ph, M, W, H, inv:px => t0 + (px-M.l)/pw*(t1-t0), t0, t1 };
+}
+/* plotted value + out-of-bounds flag per bucket, in display units */
+function computePlot(s, c){
+  const st = state.settings, f = unitF(), { upper, lower } = boundsFor(c), n = s.t.length;
+  const y = new Float64Array(n), fl = new Uint8Array(n);
+  for(let j=0;j<n;j++){
+    const hi = s.max[j] > upper, lo = lower > 0 && s.min[j] < lower;
+    let v = st.agg === 'avg' ? s.avg[j] : st.agg === 'min' ? s.min[j] : s.max[j];
+    if(st.keepSpikes){ if(hi) v = s.max[j]; else if(lo) v = s.min[j]; }
+    y[j] = v*f; fl[j] = hi ? 1 : lo ? 2 : 0;
+  }
+  return { y, fl };
+}
+function findRuns(fl){
+  const runs = []; let j0 = -1, side = 0;
+  for(let j=0;j<=fl.length;j++){
+    const f = j < fl.length ? fl[j] : 0;
+    if(f !== side){
+      if(side !== 0) runs.push({ j0, j1:j-1, side });
+      if(f !== 0) j0 = j; side = f;
+    }
+  }
+  return runs;
+}
+function boundItems(chs, col){
+  const f = unitF(), items = [];
+  chs.forEach((c, idx) => {
+    if(!state.settings.showBound[c]) return;
+    const b = boundsFor(c);
+    items.push({ c, idx, color:col.ch[c-1], short:chShort(c), upperD:b.upper*f, lowerD:b.lower*f });
+  });
+  return items;
+}
+function drawBoundLines(ctx, fr, col, items){
+  const { M, W } = fr, st = state.settings, used = [];
+  ctx.save(); ctx.lineWidth = 1.5; ctx.font = '11.5px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'right';
+  const one = (it, v, kind) => {
+    const y = fr.Y(v);
+    if(y < M.t - 1 || y > M.t + fr.ph + 1){
+      const above = y < M.t;
+      let ly = above ? M.t + 9 : M.t + fr.ph - 9;
+      while(used.some(u => Math.abs(u - ly) < 14)) ly += above ? 14 : -14;
+      used.push(ly); ctx.setLineDash([]); ctx.fillStyle = it.color; ctx.textBaseline = 'middle';
+      ctx.fillText(`${above ? '▲' : '▼'} ${it.short} ${kind} bound ${fmtNum(v, st.sig, true)} ${st.unit} is off the chart`, W-M.r-6, ly);
+      return;
+    }
+    const edge = (kind === 'upper') === CONFIG.INVERT_Y ? M.t + fr.ph : M.t;     // the out-of-bounds side of the line
+    ctx.fillStyle = hexA(col.oob, .06); ctx.fillRect(M.l, Math.min(y, edge), fr.pw, Math.abs(edge - y));
+    ctx.setLineDash([7,5]); ctx.lineDashOffset = it.idx*6; ctx.strokeStyle = it.color;
+    ctx.beginPath(); ctx.moveTo(M.l, y); ctx.lineTo(W-M.r, y); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle = it.color;
+    const up = (kind === 'upper') === CONFIG.INVERT_Y;      // label sits on the in-range side of the line
+    let ly = y + (up ? -4 : 4);
+    while(used.some(u => Math.abs(u - ly) < 14)) ly += up ? -14 : 14;
+    used.push(ly);
+    ctx.textBaseline = up ? 'bottom' : 'top';
+    ctx.fillText(`${it.short} ${kind} bound ${fmtNum(v, st.sig, true)} ${st.unit}`, W-M.r-6, ly);
+  };
+  for(const it of items){ one(it, it.upperD, 'upper'); if(it.lowerD > 0) one(it, it.lowerD, 'lower'); }
+  ctx.restore();
+}
+function statusOf(flag){ return flag === 1 ? 'above' : flag === 2 ? 'below' : 'ok'; }
+
+/* =====================================================================
+   MAIN GRAPH
+   ===================================================================== */
+const chartEl = $('#chart'), tipEl = $('#tip');
+const GM = { l:86, r:20, t:16, b:44 };
+let seriesToken = 0, hover = null, drag = null, rafId = 0, lastPinSig = '';
+const NICE_K = [1,2,3,5,10,15,30,60,120,180,360,720,1440];
+
+function chooseK(span, pw){
+  const want = Math.ceil(span/STEP/(Math.max(pw,200)/2));
+  const k = NICE_K.find(x => x >= want) || 1440;
+  const res = state.settings.resolution === 'auto' ? 1 : +state.settings.resolution;
+  return Math.max(k, res);
+}
+async function loadSeries(){
+  const my = ++seriesToken, { start, end } = state.range, span = end-start;
+  const pw = chartEl.clientWidth - GM.l - GM.r, k = chooseK(span, pw), chs = visibleChambers();
+  const res = await Promise.all(chs.map(c => api.getBuckets(state.machine, c, start-span*0.05, end+span*0.05, k)));
+  if(my !== seriesToken) return false;
+  state.series = {}; chs.forEach((c,i) => state.series[c] = res[i]); state.k = k;
+  return true;
+}
+function scheduleRefresh(){
+  if(rafId) return;
+  rafId = requestAnimationFrame(async () => { rafId = 0; if(await loadSeries()) drawMain(); });
+}
+function syncRangeInputs(){
+  $('#fromIn').value = toLocalInput(state.range.start); $('#toIn').value = toLocalInput(state.range.end);
+}
+function setRange(start, end, opts={}){
+  /* opts.typed = the user chose these dates (inputs, quick buttons, reset, open-in-graph).
+     Typed ranges are limited by the 45-day history and, while paused, become the new locked window.
+     Pan and zoom are limited by the locked window while paused, and by the full history otherwise. */
+  const lim = (state.paused && state.pauseWin && !opts.typed) ? state.pauseWin : RET;
+  const full = lim.end - lim.start;
+  const span = clamp(end-start, Math.min(10*STEP, full), full);
+  let s = start, e = s + span;
+  if(s < lim.start){ s = lim.start; e = s + span; }
+  if(e > lim.end){ e = lim.end; s = e - span; }
+  state.range = { start:s, end:e };
+  if(opts.typed && state.paused) state.pauseWin = { ...state.range };
+  syncRangeInputs(); updatePauseUI();
+  if(!opts.silent) scheduleRefresh();
+}
+function updatePauseUI(){
+  const b = $('#pauseBtn'); if(!b) return;
+  b.setAttribute('aria-pressed', String(state.paused));
+  b.textContent = state.paused ? 'Paused · click to unpause' : 'Pause view';
+  const locked = state.paused && state.pauseWin && (state.range.end - state.range.start) >= (state.pauseWin.end - state.pauseWin.start) - STEP;
+  chartEl.style.cursor = locked ? 'default' : '';
+}
+function zoomAt(centerT, factor){
+  const { start, end } = state.range, span = (end-start)*factor, frac = (centerT-start)/(end-start);
+  setRange(centerT - span*frac, centerT - span*frac + span);
+}
+const nearestIdx = (s, t) => clamp(Math.round((t - s.t[0]) / (state.k*STEP)), 0, s.t.length-1);
+
+function drawMain(){
+  const { ctx, w:W, h:H } = fitCanvas(chartEl), col = colors(), st = state.settings, f = unitF(), M = GM;
+  const { start:t0, end:t1 } = state.range, stepMs = state.k*STEP;
+  const chs = visibleChambers().filter(c => state.series[c]);
+  let lo = Infinity, hi = -Infinity; const P = {};
+  for(const c of chs){
+    const s = state.series[c], p = computePlot(s, c); P[c] = { ...p, runs:findRuns(p.fl) };
+    for(let j=0;j<s.t.length;j++){
+      if(s.t[j] < t0-stepMs || s.t[j] > t1) continue;
+      if(p.y[j] < lo) lo = p.y[j]; if(p.y[j] > hi) hi = p.y[j];
+    }
+  }
+  const items = boundItems(chs, col);
+  ({ lo, hi } = fitWithBounds(lo, hi, items));
+  if(!isFinite(lo) || !isFinite(hi)){ lo = CONFIG.SENSOR_MIN_PA*f; hi = CONFIG.SENSOR_MAX_PA*f; }
+  const yd = axisDomain(lo, hi); state.yd = yd;
+  const fr = drawFrame(ctx, W, H, M, t0, t1, yd, st.scale, col, st.unit);
+  state.plot = P;
+
+  ctx.save(); ctx.beginPath(); ctx.rect(M.l, M.t, fr.pw, fr.ph); ctx.clip();
+  drawBoundLines(ctx, fr, col, items);
+  for(const c of chs){
+    const s = state.series[c], { y, fl, runs } = P[c], cc = col.ch[c-1], n = s.t.length, b = boundsFor(c);
+    ctx.strokeStyle = cc; ctx.lineWidth = 1.7; ctx.lineJoin = 'round'; ctx.beginPath();
+    for(let j=0;j<n;j++){ const x = fr.X(s.t[j]), yy = fr.Y(y[j]); j ? ctx.lineTo(x,yy) : ctx.moveTo(x,yy); }
+    ctx.stroke();
+    for(const r of runs){
+      const bY = fr.Y((r.side === 1 ? b.upper : b.lower) * f);
+      ctx.beginPath(); ctx.moveTo(fr.X(s.t[r.j0]), bY);
+      for(let j=r.j0;j<=r.j1;j++) ctx.lineTo(fr.X(s.t[j]), fr.Y(y[j]));
+      ctx.lineTo(fr.X(s.t[r.j1]), bY); ctx.closePath(); ctx.fillStyle = hexA(col.oob, .30); ctx.fill();
+      ctx.strokeStyle = col.oob; ctx.lineWidth = 2.6; ctx.beginPath();
+      for(let j=Math.max(0,r.j0-1);j<=Math.min(n-1,r.j1+1);j++){ const x = fr.X(s.t[j]), yy = fr.Y(y[j]); j===Math.max(0,r.j0-1) ? ctx.moveTo(x,yy) : ctx.lineTo(x,yy); }
+      ctx.stroke();
+      for(const j of [r.j0, r.j1]){ ctx.beginPath(); ctx.arc(fr.X(s.t[j]), fr.Y(y[j]), 3.6, 0, 6.2832); ctx.fillStyle = col.oob; ctx.fill(); }
+    }
+  }
+  if(!chs.length){
+    ctx.fillStyle = col.muted; ctx.font = '14px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('No chambers selected. Turn one on above to see its pressure.', M.l + fr.pw/2, M.t + fr.ph/2);
+  }
+
+  /* hover feedback */
+  let tip = null;
+  if(hover && chs.length){
+    const tH = fr.inv(hover.x); let focus = chs[0], bestD = Infinity;
+    const rows = chs.map(c => {
+      const s = state.series[c], j = nearestIdx(s, tH), yy = fr.Y(P[c].y[j]); const d = Math.abs(yy - hover.y);
+      if(d < bestD){ bestD = d; focus = c; } return { c, s, j, yy };
+    });
+    const fr0 = rows.find(r => r.c === focus), xF = fr.X(fr0.s.t[fr0.j]);
+    for(const c of chs) for(const r of P[c].runs) for(let j=r.j0;j<=r.j1;j++){
+      ctx.beginPath(); ctx.arc(fr.X(state.series[c].t[j]), fr.Y(P[c].y[j]), 3, 0, 6.2832); ctx.fillStyle = col.oob; ctx.fill();
+    }
+    const fRun = P[focus].runs.find(r => fr0.j >= r.j0 && fr0.j <= r.j1);
+    if(fRun){
+      const xa = fr.X(fr0.s.t[fRun.j0]), xb = fr.X(fr0.s.t[fRun.j1] + stepMs);
+      ctx.fillStyle = hexA(col.oob, .11); ctx.fillRect(xa, M.t, Math.max(2, xb-xa), fr.ph);
+      ctx.fillStyle = col.oob; ctx.font = '600 11.5px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText(`Out of bounds · ${fmtDur((fRun.j1-fRun.j0+1)*stepMs)}`, Math.max(M.l+4, xa+4), M.t+4);
+    }
+    ctx.strokeStyle = hexA(col.ink.length === 7 ? col.ink : '#888888', .45); ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(xF, M.t); ctx.lineTo(xF, M.t+fr.ph); ctx.stroke(); ctx.setLineDash([]);
+    for(const r of rows){
+      const x = fr.X(r.s.t[r.j]), fl = P[r.c].fl[r.j];
+      if(fl){ ctx.beginPath(); ctx.arc(x, r.yy, 8.5, 0, 6.2832); ctx.strokeStyle = col.oob; ctx.lineWidth = 2; ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(x, r.yy, 4.8, 0, 6.2832); ctx.fillStyle = fl ? col.oob : col.ch[r.c-1]; ctx.fill();
+      ctx.strokeStyle = col.panel; ctx.lineWidth = 1.6; ctx.stroke();
+    }
+    tip = { x:xF, rows:rows.map(r => ({ c:r.c, fl:P[r.c].fl[r.j], v:P[r.c].y[r.j], mn:r.s.min[r.j]*f, mx:r.s.max[r.j]*f })), t:fr0.s.t[fr0.j] };
+  }
+
+  /* pinned points */
+  for(const pin of state.pins){
+    const s = state.series[pin.c]; if(!s) continue;
+    const j = Math.round((pin.t - s.t[0])/stepMs); if(j < 0 || j >= s.t.length) continue;
+    const x = fr.X(s.t[j]); if(x < M.l || x > W-M.r) continue;
+    const y = fr.Y(P[pin.c].y[j]), fl = P[pin.c].fl[j], cc = col.ch[pin.c-1];
+    ctx.beginPath(); ctx.arc(x, y, 5.5, 0, 6.2832); ctx.fillStyle = fl ? col.oob : cc; ctx.fill(); ctx.strokeStyle = col.ink; ctx.lineWidth = 2; ctx.stroke();
+    const lines = [fmtMDHM(s.t[j]), `${fmtNum(P[pin.c].y[j], st.sig)} ${st.unit}`, fl ? 'Out of bounds' : 'In range'];
+    const bw = 146, bh = 52; let bx = x+12, by = y-bh-12; if(bx+bw > W-M.r) bx = x-bw-12; if(by < M.t) by = y+12;
+    ctx.fillStyle = col.panel; ctx.strokeStyle = fl ? col.oob : cc; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, bw, bh, 6) : ctx.rect(bx, by, bw, bh); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = MONO; ctx.fillStyle = col.muted; ctx.fillText(`${chShort(pin.c)} · ${lines[0]}`, bx+8, by+6);
+    ctx.fillStyle = col.ink; ctx.fillText(lines[1], bx+8, by+21);
+    ctx.fillStyle = fl ? col.oob : col.muted; ctx.font = '600 11px "IBM Plex Sans", system-ui, sans-serif'; ctx.fillText(lines[2], bx+8, by+36);
+  }
+  ctx.restore();
+  state.geom = fr;
+  renderTip(tip, fr, col);
+  renderPins();
+  renderStatusLine();
+}
+function renderTip(tip, fr, col){
+  if(!tip){ tipEl.hidden = true; return; }
+  const st = state.settings, k = state.k;
+  let html = `<div class="tt">${fmtDT(tip.t)}${k > 1 ? ` · ${k >= 1440 ? '1 day' : k >= 60 ? (k/60)+' h' : k+' min'} step` : ''}</div>`;
+  for(const r of tip.rows){
+    html += `<div class="r${r.fl ? ' out' : ''}"><i style="background:${col.ch[r.c-1]}"></i><b>${esc(chName(r.c))}</b><span class="v">${fmtNum(r.v, st.sig)} ${st.unit}</span></div>`;
+    html += `<div class="sub">${r.fl ? (r.fl === 1 ? 'above upper bound' : 'below lower bound') : 'in range'}${k > 1 ? ` · min ${fmtNum(r.mn, 2)} · max ${fmtNum(r.mx, 2)}` : ''}</div>`;
+  }
+  tipEl.innerHTML = html; tipEl.hidden = false;
+  const wrapW = $('#chartWrap').clientWidth, tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+  let x = fr.X(tip.t) + 16; if(x + tw > wrapW - 6) x = fr.X(tip.t) - tw - 16;
+  tipEl.style.left = Math.max(6, x) + 'px'; tipEl.style.top = clamp(hover.y - th/2, 6, fr.H - th - 6) + 'px';
+}
+function renderPins(){
+  const st = state.settings, parts = [];
+  state.pins.forEach((pin, i) => {
+    const s = state.series[pin.c], P = state.plot[pin.c]; if(!s || !P) return;
+    const j = Math.round((pin.t - s.t[0])/(state.k*STEP)); if(j < 0 || j >= s.t.length) return;
+    parts.push(`<span class="pin" style="border-color:${colors().ch[pin.c-1]}">${esc(chShort(pin.c))} · ${fmtDT(s.t[j])} · ${fmtNum(P.y[j], st.sig)} ${st.unit} · ${P.fl[j] ? 'out of bounds' : 'in range'}<button data-unpin="${i}" aria-label="Remove pin">✕</button></span>`);
+  });
+  const sig = parts.join('');
+  if(sig !== lastPinSig){ $('#pins').innerHTML = sig; lastPinSig = sig; }
+}
+function renderStatusLine(){
+  const k = state.k, st = state.settings;
+  const res = k === 1 ? 'every reading (1 min)' : `one point per ${k >= 1440 ? '1 day' : k >= 60 ? (k/60)+' h' : k+' min'}, ${st.agg === 'avg' ? 'average' : st.agg === 'max' ? 'maximum' : 'minimum'}${st.keepSpikes ? ', excursions kept at peak' : ''}`;
+  const ch = state.chOn.length ? state.chOn.map(chName).join(', ') : 'no chambers selected';
+  const axis = st.yMode === 'full' ? ' · full sensor range' : st.yMode === 'custom' ? ' · custom axis range' : st.yMode === 'focus' ? ' · fixed operating and out-of-bounds window' : st.yMode === 'fitall' ? ' · fitted to the data and bound lines' : '';
+  $('#statusLine').textContent = `Machine ${state.machine} · ${ch} · ${fmtDT(state.range.start)} to ${fmtDT(state.range.end)} · ${res}${axis}${state.paused ? ' · view paused' : ''}`;
+}
+function renderLegend(){
+  const col = colors(); const chs = visibleChambers();
+  $('#legend').innerHTML = chs.map(c => `<span><i style="border-color:${col.ch[c-1]}"></i>${esc(chName(c))}</span>`).join('') +
+    `<span><i class="dash"></i>Bound lines (dashed, in each chamber's color)</span><span><i class="blk"></i>Out of bounds</span>`;
+}
+function renderBoundChip(){
+  const s = state.settings, f = unitF(), col = colors(), groups = new Map();
+  chambers().forEach(c => { const k = s.bounds[c].upperPa; if(!groups.has(k)) groups.set(k, []); groups.get(k).push(chShort(c)); });
+  $('#boundChip').textContent = 'Bounds: ' + [...groups].map(([v, names]) => `${names.join(', ')} ≤ ${fmtNum(v*f, s.sig, true)}`).join(' · ') + ' ' + s.unit;
+  $('#boundSeg').innerHTML = chambers().map(c =>
+    `<label class="tgl" style="--cc:${col.ch[c-1]}" title="Show or hide the ${esc(chName(c))} bound line"><input type="checkbox" value="${c}"${s.showBound[c] ? ' checked' : ''}><span><i class="sw"></i>${esc(chShort(c))}</span></label>`).join('');
+  $('#fullBtn').setAttribute('aria-pressed', String(s.yMode === 'full'));
+}
+
+/* graph interactions */
+function plotPoint(e){ const r = chartEl.getBoundingClientRect(); return { x:e.clientX - r.left, y:e.clientY - r.top }; }
+function inPlot(p){ const g = state.geom; return g && p.x >= g.M.l && p.x <= g.W - g.M.r && p.y >= g.M.t && p.y <= g.M.t + g.ph; }
+chartEl.addEventListener('pointerdown', e => {
+  if(e.button !== 0 && e.pointerType === 'mouse') return;
+  chartEl.setPointerCapture(e.pointerId);
+  const p = plotPoint(e); drag = { x0:p.x, range:{ ...state.range }, moved:false, id:e.pointerId };
+});
+chartEl.addEventListener('pointermove', e => {
+  const p = plotPoint(e);
+  if(drag){
+    const dx = p.x - drag.x0;
+    if(Math.abs(dx) > 3) { drag.moved = true; chartEl.classList.add('dragging'); hover = null; }
+    if(drag.moved && state.geom){
+      const span = drag.range.end - drag.range.start, dt = -dx/state.geom.pw*span;
+      setRange(drag.range.start + dt, drag.range.end + dt);
+    }
+    return;
+  }
+  hover = inPlot(p) ? p : null;
+  if(!rafId) rafId = requestAnimationFrame(() => { rafId = 0; if(state.series && !!state.geom) drawMain(); });
+});
+chartEl.addEventListener('pointerup', e => {
+  const wasDrag = drag && drag.moved; chartEl.classList.remove('dragging');
+  if(drag && !wasDrag){
+    const p = plotPoint(e); hover = inPlot(p) ? p : null;
+    if(hover) togglePin();
+  }
+  drag = null;
+  if(e.pointerType !== 'mouse'){ hover = null; drawMain(); }
+});
+chartEl.addEventListener('pointercancel', () => { drag = null; chartEl.classList.remove('dragging'); });
+chartEl.addEventListener('pointerleave', () => { if(!drag){ hover = null; if(!!state.geom) drawMain(); } });
+chartEl.addEventListener('wheel', e => {
+  e.preventDefault(); const p = plotPoint(e); if(!state.geom) return;
+  zoomAt(state.geom.inv(clamp(p.x, state.geom.M.l, state.geom.W - state.geom.M.r)), Math.pow(1.0018, e.deltaY));
+}, { passive:false });
+chartEl.addEventListener('keydown', e => {
+  const span = state.range.end - state.range.start;
+  if(e.key === 'ArrowLeft'){ setRange(state.range.start - span*.2, state.range.end - span*.2); e.preventDefault(); }
+  else if(e.key === 'ArrowRight'){ setRange(state.range.start + span*.2, state.range.end + span*.2); e.preventDefault(); }
+  else if(e.key === '+' || e.key === '='){ zoomAt((state.range.start+state.range.end)/2, .6); }
+  else if(e.key === '-'){ zoomAt((state.range.start+state.range.end)/2, 1/.6); }
+  else if(e.key === 'Escape'){ state.pins = []; lastPinSig = ''; drawMain(); }
+});
+function togglePin(){
+  const g = state.geom; if(!g || !hover) return;
+  const tH = g.inv(hover.x), chs = visibleChambers().filter(c => state.series[c]); if(!chs.length) return;
+  let best = null, bd = Infinity;
+  for(const c of chs){ const s = state.series[c], j = nearestIdx(s, tH), d = Math.abs(g.Y(state.plot[c].y[j]) - hover.y); if(d < bd){ bd = d; best = { c, t:s.t[j] }; } }
+  const i = state.pins.findIndex(p => p.c === best.c && p.t === best.t);
+  if(i >= 0) state.pins.splice(i,1); else { state.pins.push(best); if(state.pins.length > 6) state.pins.shift(); }
+  drawMain();
+}
+$('#pins').addEventListener('click', e => {
+  const b = e.target.closest('[data-unpin]'); if(!b) return;
+  state.pins.splice(+b.dataset.unpin, 1); drawMain();
+});
+
+/* toolbar wiring */
+$('#fromIn').addEventListener('change', e => { const t = new Date(e.target.value).getTime(); if(!isNaN(t)) setRange(t, Math.max(t + 10*STEP, state.range.end), { typed:true }); });
+$('#toIn').addEventListener('change', e => { const t = new Date(e.target.value).getTime(); if(!isNaN(t)) setRange(Math.min(state.range.start, t - 10*STEP), t, { typed:true }); });
+$('#quick').addEventListener('click', e => { const b = e.target.closest('[data-days]'); if(!b) return; const d = +b.dataset.days*86400000; setRange(RET.end - d, RET.end, { typed:true }); });
+$('#zoomIn').onclick = () => zoomAt((state.range.start+state.range.end)/2, .6);
+$('#zoomOut').onclick = () => zoomAt((state.range.start+state.range.end)/2, 1/.6);
+$('#panL').onclick = () => { const s = state.range.end - state.range.start; setRange(state.range.start - s*.25, state.range.end - s*.25); };
+$('#panR').onclick = () => { const s = state.range.end - state.range.start; setRange(state.range.start + s*.25, state.range.end + s*.25); };
+$('#resetView').onclick = () => { setRange(RET.end - CONFIG.DEFAULT_RANGE_DAYS*86400000, RET.end, { typed:true }); state.pins = []; };
+$('#boundSeg').addEventListener('change', e => {
+  state.settings.showBound[+e.target.value] = e.target.checked; persistSettings(); if(state.geom) drawMain();
+});
+$('#fullBtn').onclick = () => {
+  state.settings.yMode = state.settings.yMode === 'full' ? 'fit' : 'full'; persistSettings(); renderBoundChip(); if(state.geom) drawMain();
+};
+$('#pauseBtn').onclick = () => {
+  state.paused = !state.paused; state.pauseWin = state.paused ? { ...state.range } : null;
+  updatePauseUI(); renderStatusLine();
+  toast(state.paused ? 'View paused. Zoom and pan stay inside these dates.' : 'View unpaused. You can pan across the full history.');
+};
+function buildChamberSeg(){
+  const col = colors();
+  $('#chamberSeg').innerHTML = chambers().map(c =>
+    `<label class="tgl" style="--cc:${col.ch[c-1]}"><input type="checkbox" value="${c}"${state.chOn.includes(c) ? ' checked' : ''}><span><i class="sw"></i>${esc(chName(c))}</span></label>`).join('');
+}
+$('#chamberSeg').addEventListener('change', () => {
+  state.chOn = $$('#chamberSeg input:checked').map(i => +i.value);
+  state.pins = state.pins.filter(p => state.chOn.includes(p.c)); hover = null;
+  renderLegend(); scheduleRefresh();
+});
+
+/* =====================================================================
+   SETTINGS DIALOG
+   ===================================================================== */
+const dlg = $('#settings'); let dlgUnit = 'Pa';
+const numStr = v => String(+v.toPrecision(4));
+const parseNum = s => parseFloat(String(s).replace(/\s/g,'').replace(/[x×]10\^?/i,'e'));
+function openSettings(){
+  const s = state.settings, f = UNITS[s.unit].f; dlgUnit = s.unit;
+  $('#sUnit').value = s.unit;
+  $('#sBounds').innerHTML = chambers().map(c => { const b = s.bounds[c];
+    return `<div class="brow" data-c="${c}"><div class="bname">${esc(chName(c))}</div>
+      <div class="field"><label for="bu${c}">Upper bound</label><div class="row"><input type="text" class="bnum" id="bu${c}" inputmode="decimal" value="${numStr(b.upperPa*f)}"><span class="mono unitl">${s.unit}</span></div></div>
+      <div class="field"><label class="row"><input type="checkbox" class="blow-on"${b.lowerOn ? ' checked' : ''}> Also flag readings below a lower bound</label>
+        <div class="row"><input type="text" class="bnum blow" inputmode="decimal" aria-label="Lower bound" value="${numStr(b.lowerPa*f)}"${b.lowerOn ? '' : ' disabled'}><span class="mono unitl">${s.unit}</span></div></div>
+      <label class="row"><input type="checkbox" class="bshow"${s.showBound[c] ? ' checked' : ''}> Show this bound line on the graph</label></div>`; }).join('');
+  $('#sYMode').value = s.yMode; $('#sYMin').value = numStr(s.yMinPa*f); $('#sYMax').value = numStr(s.yMaxPa*f);
+  $$('#settings .unitl').forEach(el => el.textContent = s.unit);
+  toggleYInputs();
+  $('#sScale').value = s.scale; $('#sAgg').value = s.agg; $('#sSpikes').checked = s.keepSpikes;
+  $('#sRes').value = s.resolution; $('#sSig').value = s.sig; $('#sGroup').value = s.groupWindowMin;
+  dlg.showModal();
+}
+function toggleYInputs(){ $('#sYMin').disabled = $('#sYMax').disabled = false; }
+$('#sYMode').addEventListener('change', toggleYInputs);
+['#sYMin', '#sYMax'].forEach(id => $(id).addEventListener('input', () => { $('#sYMode').value = 'custom'; }));
+$('#sBounds').addEventListener('change', e => {
+  if(e.target.classList.contains('blow-on')) e.target.closest('.brow').querySelector('.blow').disabled = !e.target.checked;
+});
+$('#sUnit').addEventListener('change', e => {
+  const nf = UNITS[e.target.value].f, of = UNITS[dlgUnit].f;
+  $$('#settings .bnum, #sYMin, #sYMax').forEach(inp => { const v = parseNum(inp.value); if(isFinite(v)) inp.value = numStr(v/of*nf); });
+  dlgUnit = e.target.value; $$('#settings .unitl').forEach(el => el.textContent = dlgUnit);
+});
+function closeSettings(){ dlg.close(); }
+$('#openSettings').onclick = openSettings; $('#boundChip').onclick = openSettings;
+$('#setClose').onclick = closeSettings; $('#setCancel').onclick = closeSettings;
+$('#setReset').onclick = () => { state.settings = defaultSettings(); persistSettings(); closeSettings(); onSettingsChanged(true); toast('Defaults restored'); };
+$('#setApply').onclick = () => {
+  const unit = $('#sUnit').value, f = UNITS[unit].f, nb = {}, show = {};
+  for(const row of $$('#sBounds .brow')){
+    const c = +row.dataset.c, up = parseNum($('.bnum:not(.blow)', row).value)/f, lowOn = $('.blow-on', row).checked, low = parseNum($('.blow', row).value)/f;
+    if(!(up > 0)){ toast(`${chName(c)}: enter an upper bound greater than 0`); return; }
+    if(lowOn && !(low > 0 && low < up)){ toast(`${chName(c)}: the lower bound must be above 0 and below the upper bound`); return; }
+    nb[c] = { upperPa:up, lowerOn:lowOn, lowerPa:(low > 0) ? low : state.settings.bounds[c].lowerPa };
+    show[c] = $('.bshow', row).checked;
+  }
+  const mode = $('#sYMode').value, ymin = parseNum($('#sYMin').value)/f, ymax = parseNum($('#sYMax').value)/f;
+  if(mode === 'custom' && !(ymin > 0 && ymax > ymin)){ toast('Custom range: the first value must be above 0 and below the second'); return; }
+  const okY = ymin > 0 && ymax > ymin;
+  state.settings = { ...state.settings, unit, bounds:nb, showBound:show, yMode:mode,
+    yMinPa:okY ? ymin : state.settings.yMinPa, yMaxPa:okY ? ymax : state.settings.yMaxPa,
+    scale:$('#sScale').value, agg:$('#sAgg').value, keepSpikes:$('#sSpikes').checked, resolution:$('#sRes').value,
+    sig:clamp(Math.round(+$('#sSig').value || 3), 1, 6), groupWindowMin:clamp(Math.round(+$('#sGroup').value || 30), 1, 1440) };
+  persistSettings(); closeSettings(); onSettingsChanged(true); toast('Settings applied');
+};
+function persistSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); }catch(e){} }
+function onSettingsChanged(boundsMayHaveChanged){
+  renderBoundChip(); refreshFleet(); refreshIncBadge(); refreshActive();
+}
+
+/* =====================================================================
+   STATISTICS TAB
+   ===================================================================== */
+function statsWindow(){
+  const e = RET.end;
+  switch(state.statsWin){
+    case '24h': return { start:e - 86400000, end:e };
+    case '7d':  return { start:e - 7*86400000, end:e };
+    case '30d': return { start:e - 30*86400000, end:e };
+    case 'all': return { start:RET.start, end:e };
+    default:    return { ...state.range };
+  }
+}
+async function renderStats(){
+  const w = statsWindow(), B = allBounds(), st = state.settings, f = unitF(), col = colors();
+  const res = await Promise.all(chambers().map(c => api.getStats(state.machine, c, w.start, w.end, B)));
+  const pv = t => `${fmtNum(t*f, st.sig)}`;
+  const bad = (t, b) => t > b.upper || (b.lower > 0 && t < b.lower);
+  const rows = [
+    ['Latest reading', 'Most recent sample', (s,b) => [pv(s.latest), bad(s.latest,b)]],
+    ['Median', 'Typical pressure; ignores short spikes', (s,b) => [pv(s.median), bad(s.median,b)]],
+    ['Average', 'Mean of all readings; pulled up by spikes', (s,b) => [pv(s.mean), bad(s.mean,b)]],
+    ['Minimum', 'Lowest reading and when it happened', (s,b) => [`${pv(s.min)}<small>${fmtMDHM(s.minT)}</small>`, false]],
+    ['Maximum', 'Highest reading and when it happened', (s,b) => [`${pv(s.max)}<small>${fmtMDHM(s.maxT)}</small>`, bad(s.max,b)]],
+    ['Standard deviation', 'Spread around the average', (s,b) => [pv(s.sd), false]],
+    ['Coefficient of variation', 'Spread relative to the average', (s,b) => [(s.cv*100).toFixed(0) + '%', false]],
+    ['25th to 75th percentile', 'Middle half of readings (IQR)', (s,b) => [`${pv(s.p25)} – ${pv(s.p75)}`, false]],
+    ['95th percentile', '1 reading in 20 is above this', (s,b) => [pv(s.p95), bad(s.p95,b)]],
+    ['99th percentile', '1 reading in 100 is above this', (s,b) => [pv(s.p99), bad(s.p99,b)]],
+    ['Upper bound', 'Limit used for this chamber', (s,b) => [pv(b.upper), false]],
+    ['Time out of bounds', 'Share of readings outside the bounds', (s,b) => [s.pctOob.toFixed(2) + '%', s.pctOob > 0]],
+    ['Incidents', 'Out-of-bounds episodes overlapping the window', (s,b) => [String(s.count), s.count > 0]],
+    ['Total downtime', 'Combined time out of bounds', (s,b) => [s.count ? fmtDur(s.down) : '—', s.count > 0]],
+    ['Longest incident', 'Longest single episode', (s,b) => [s.count ? fmtDur(s.longest) : '—', false]],
+    ['Mean time between incidents', 'Window length divided by incident count', (s,b) => [s.mtbi ? fmtDur(s.mtbi) : '—', false]],
+    ['Long-term trend', 'Slope of log pressure; steady drift up warns of a slow leak',
+      (s,b) => { const d = s.slope, cls = d > 0.004 ? 'up' : d < -0.004 ? 'down' : 'flat', txt = cls === 'up' ? 'Rising' : cls === 'down' ? 'Falling' : 'Stable';
+        return [`<span class="pill ${cls}">${txt}</span><small>${d >= 0 ? '+' : ''}${d.toFixed(3)} decades/day</small>`, false]; }],
+    ['Readings in window', 'Samples used for these numbers', (s,b) => [s.n.toLocaleString(), false]]
+  ];
+  let html = `<thead><tr><th>Measure (${st.unit})</th>${chambers().map(c => `<th class="num"><span style="color:${col.ch[c-1]}">●</span> ${esc(chName(c))}</th>`).join('')}</tr></thead><tbody>`;
+  for(const [name, help, fn] of rows){
+    html += `<tr><td>${name}<small>${help}</small></td>`;
+    for(let i=0;i<res.length;i++){ const [v, isBad] = fn(res[i], B[i+1]); html += `<td class="num${isBad ? ' bad' : ''}">${v}</td>`; }
+    html += '</tr>';
+  }
+  $('#statsTable').innerHTML = html + '</tbody>';
+  $('#statsInfo').textContent = `Machine ${state.machine} · ${fmtDT(w.start)} to ${fmtDT(w.end)}`;
+  await drawTrend(w);
+}
+async function drawTrend(w){
+  const cv = $('#trend'), { ctx, w:W, h:H } = fitCanvas(cv), col = colors(), st = state.settings, f = unitF();
+  const data = await Promise.all(chambers().map(c => api.getDailyMedians(state.machine, c, w.start, w.end)));
+  const items = boundItems(chambers(), col);
+  let lo = Infinity, hi = -Infinity;
+  data.forEach(d => d.forEach(p => { lo = Math.min(lo, p.median*f); hi = Math.max(hi, p.median*f); }));
+  ({ lo, hi } = fitWithBounds(lo, hi, items));
+  if(!isFinite(lo) || !isFinite(hi)){ lo = CONFIG.SENSOR_MIN_PA*f; hi = CONFIG.SENSOR_MAX_PA*f; }
+  const yd = axisDomain(lo, hi), M = { l:78, r:14, t:12, b:42 };
+  const all = data.flat();
+  const t0 = all.length ? Math.min(w.start, ...all.map(p => p.t)) : w.start, t1 = all.length ? Math.max(w.end, ...all.map(p => p.t)) : w.end;
+  const fr = drawFrame(ctx, W, H, M, t0, t1, yd, st.scale, col, st.unit);
+  ctx.save(); ctx.beginPath(); ctx.rect(M.l, M.t, fr.pw, fr.ph); ctx.clip();
+  drawBoundLines(ctx, fr, col, items);
+  data.forEach((d, i) => {
+    const b = boundsFor(i+1);
+    ctx.strokeStyle = col.ch[i]; ctx.lineWidth = 1.8; ctx.beginPath();
+    d.forEach((p, j) => { const x = fr.X(p.t), y = fr.Y(p.median*f); j ? ctx.lineTo(x,y) : ctx.moveTo(x,y); }); ctx.stroke();
+    d.forEach(p => { ctx.beginPath(); ctx.arc(fr.X(p.t), fr.Y(p.median*f), 2.6, 0, 6.2832); ctx.fillStyle = (p.median > b.upper || (b.lower > 0 && p.median < b.lower)) ? col.oob : col.ch[i]; ctx.fill(); });
+  });
+  ctx.restore();
+  $('#trendLegend').innerHTML = chambers().map(c => `<span><i style="border-color:${col.ch[c-1]}"></i>${esc(chName(c))}</span>`).join('') + `<span><i class="dash"></i>Bound lines</span>`;
+}
+$('#statsWin').addEventListener('change', e => { state.statsWin = e.target.value; renderStats(); });
+
+/* =====================================================================
+   INCIDENTS TAB
+   ===================================================================== */
+const incGapMs = () => state.settings.groupWindowMin * 60000;
+const incEnd = i => i.end == null ? RET.end + STEP : i.end;
+function clusterIncidents(list){
+  const asc = [...list].sort((a,b) => a.start - b.start), groups = [];
+  let cur = null;
+  for(const i of asc){
+    if(cur && i.start <= cur.end + incGapMs()){ cur.items.push(i); cur.end = Math.max(cur.end, incEnd(i)); }
+    else { cur = { items:[i], start:i.start, end:incEnd(i) }; groups.push(cur); }
+  }
+  groups.forEach(g => {                           // union of intervals = real downtime
+    const iv = g.items.map(i => [i.start, incEnd(i)]).sort((a,b) => a[0]-b[0]); let tot = 0, ce = -Infinity, cs = 0;
+    for(const [s,e] of iv){ if(s > ce){ if(ce > -Infinity) tot += ce-cs; cs = s; ce = e; } else ce = Math.max(ce, e); }
+    g.down = tot + (ce-cs); g.items.sort((a,b) => a.start - b.start);
+    g.key = g.items[0].id;
+  });
+  return groups.sort((a,b) => b.start - a.start);
+}
+async function refreshIncBadge(){
+  const list = await api.getIncidents({ machine:state.machine, chamber:null, start:RET.start, end:RET.end, bounds:allBounds() });
+  const b = $('#incBadge'); b.textContent = list.length > 99 ? '99+' : list.length; b.hidden = list.length === 0;
+}
+async function renderIncidents(){
+  const list = await api.getIncidents({ machine:state.incScope === 'all' ? null : state.machine,
+    chamber:state.incChamber === 'all' ? null : +state.incChamber, start:state.incFrom, end:state.incTo, bounds:allBounds() });
+  state.incidents = list; state.incMap = new Map(list.map(i => [i.id, i]));
+  const groups = state.incGroup ? clusterIncidents(list) : null;
+  const down = (() => { const g = clusterIncidents(list); return g.reduce((a,b) => a + b.down, 0); })();
+  $('#incSum').innerHTML = `<span><b>${list.length}</b> incident${list.length === 1 ? '' : 's'}</span>` +
+    (groups ? `<span><b>${groups.length}</b> time group${groups.length === 1 ? '' : 's'}</span>` : '') +
+    `<span>Time out of bounds <b>${fmtDur(down)}</b></span><span>Ongoing now <b>${list.filter(i => i.ongoing).length}</b></span>`;
+  if(!list.length){
+    $('#incTable').innerHTML = ''; $('#incMore').hidden = true;
+    $('#incTable').innerHTML = `<tbody><tr><td class="empty">No out-of-bounds readings in this range with the current bounds.</td></tr></tbody>`;
+    return;
+  }
+  const counts = await api.getNoteCounts(list.map(i => i.id));
+  const units = state.settings.unit, f = unitF(), sig = state.settings.sig;
+  const rowHtml = i => `<tr class="row sev-${i.severity}${state.openInc.has(i.id) ? ' open' : ''}" data-id="${i.id}" tabindex="0">
+      <td>${fmtDateLong(i.start)}</td><td>Machine ${i.machine}</td><td>${esc(chName(i.chamber))}</td>
+      <td class="num">${fmtHM(i.start)}</td><td class="num">${i.ongoing ? '<span class="ongoing">Ongoing</span>' : fmtHM(i.end)}</td>
+      <td class="num">${fmtDur(i.durationMs)}</td><td class="num">${fmtNum(i.peak*f, sig)} ${units}</td>
+      <td><span class="sev ${i.severity}">${i.severity}</span></td>
+      <td class="notecount" data-nc="${i.id}">${counts[i.id] ? '📝 ' + counts[i.id] : ''}</td></tr>`;
+  let html = `<thead><tr><th>Date</th><th>Machine</th><th>Chamber</th><th class="num">Start</th><th class="num">End</th><th class="num">Duration</th><th class="num">Peak</th><th>Severity</th><th>Notes</th></tr></thead><tbody>`;
+  let shown = 0, more = false;
+  const emit = (items) => { items.forEach(i => { html += rowHtml(i); if(state.openInc.has(i.id)) html += detailShell(i); }); };
+  if(groups){
+    for(const g of groups){
+      if(shown >= state.incShown){ more = true; break; }
+      const collapsed = state.collapsed.has(g.key);
+      const ms = [...new Set(g.items.map(i => i.machine))], chs = [...new Set(g.items.map(i => chShort(i.chamber)))].sort();
+      html += `<tr class="grp" data-g="${g.key}"><td colspan="9">${collapsed ? '▸' : '▾'} ${fmtMDHM(g.start)} to ${g.end > RET.end ? 'now' : fmtHM(g.end)}
+        <small>${g.items.length} incident${g.items.length === 1 ? '' : 's'} · ${ms.length > 3 ? ms.length + ' machines' : 'M' + ms.join(', M')} · ${chs.join(', ')} · downtime ${fmtDur(g.down)}</small></td></tr>`;
+      if(!collapsed) emit(g.items);
+      shown += g.items.length;
+    }
+  } else {
+    for(const i of list){ if(shown >= state.incShown){ more = true; break; } emit([i]); shown++; }
+  }
+  $('#incTable').innerHTML = html + '</tbody>';
+  $('#incMore').hidden = !more;
+  $$('#incTable tr.detail').forEach(tr => fillDetail(tr.dataset.for));
+}
+function detailShell(i){
+  const f = unitF(), st = state.settings;
+  return `<tr class="detail" data-for="${i.id}"><td colspan="9"><div class="det">
+    <div class="det-head"><span><b>Incident ID:</b> <code>${i.id}</code></span>
+      <span><b>Machine:</b> ${i.machine} · ${esc(chName(i.chamber))}</span>
+      <span><b>Total downtime:</b> ${fmtDur(i.durationMs)}${i.ongoing ? ' so far' : ''}</span>
+      <span><b>Peak:</b> <span class="mono">${fmtNum(i.peak*f, st.sig)} ${st.unit}</span> at ${fmtMDHM(i.peakT)} (${i.ratio.toFixed(1)}× the ${i.side === 'high' ? 'upper' : 'lower'} bound)</span>
+      <span class="spacer"></span>
+      <button class="btn small" data-act="open-graph" data-id="${i.id}">Open in main graph</button></div>
+    <div class="det-grid">
+      <div><canvas class="mini" data-mini="${i.id}"></canvas><div class="mini-read" data-read="${i.id}">Hover the chart to read each point.</div></div>
+      <div><h4>Engineer notes</h4><div class="notes-list" data-notes="${i.id}"></div>
+        <div class="note-form">
+          <input class="n-author" placeholder="Your name or ID" aria-label="Your name or ID" value="${esc(localGet('cdsem.engineer') || '')}">
+          <textarea class="n-what" placeholder="What happened?" aria-label="What happened"></textarea>
+          <textarea class="n-fix" placeholder="How was it fixed? Steps to repeat next time." aria-label="How it was fixed"></textarea>
+          <div><button class="btn primary small" data-act="save-note" data-id="${i.id}">Save note</button></div>
+        </div></div>
+    </div></div></td></tr>`;
+}
+const localGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const localSet = (k,v) => { try{ localStorage.setItem(k,v); }catch(e){} };
+
+const minis = new Map();
+async function fillDetail(id){
+  const inc = state.incMap.get(id); if(!inc) return;
+  renderNotes(id);
+  const cv = $(`canvas[data-mini="${CSS.escape(id)}"]`); if(!cv) return;
+  const dur = incEnd(inc) - inc.start, pad = Math.max(45*60000, dur*.35);
+  const w0 = Math.max(RET.start, inc.start - pad), w1 = Math.min(RET.end, (inc.end == null ? RET.end : inc.end) + pad);
+  const k = NICE_K.find(x => x >= Math.ceil((w1-w0)/STEP/600)) || 1440;
+  const s = await api.getBuckets(inc.machine, inc.chamber, w0, w1, k);
+  minis.set(id, { inc, s, w0, w1, k, hoverJ:-1, cv });
+  drawMini(id);
+}
+function drawMini(id){
+  const m = minis.get(id); if(!m || !m.cv.isConnected) return;
+  const { inc, s, w0, w1, k } = m, col = colors(), st = state.settings, f = unitF(), b = boundsFor(inc.chamber);
+  const { ctx, w:W, h:H } = fitCanvas(m.cv);
+  const { y, fl } = computePlot(s, inc.chamber), cc = col.ch[inc.chamber-1];
+  const items = [{ c:inc.chamber, idx:0, color:cc, short:chShort(inc.chamber), upperD:b.upper*f, lowerD:b.lower*f }];
+  let lo = items[0].upperD, hi = lo; for(let j=0;j<y.length;j++){ lo = Math.min(lo, y[j]); hi = Math.max(hi, y[j]); } if(items[0].lowerD > 0) lo = Math.min(lo, items[0].lowerD);
+  const yd = yDomain(lo, hi, st.scale), M = { l:76, r:12, t:12, b:40 };
+  const fr = drawFrame(ctx, W, H, M, w0, w1, yd, st.scale, col, st.unit);
+  ctx.save(); ctx.beginPath(); ctx.rect(M.l, M.t, fr.pw, fr.ph); ctx.clip();
+  const xs = fr.X(inc.start), xe = fr.X(inc.end == null ? w1 : inc.end);
+  ctx.fillStyle = hexA(col.oob, .10); ctx.fillRect(xs, M.t, Math.max(2, xe-xs), fr.ph);
+  drawBoundLines(ctx, fr, col, items);
+  ctx.strokeStyle = cc; ctx.lineWidth = 1.5; ctx.beginPath();
+  for(let j=0;j<y.length;j++){ const x = fr.X(s.t[j]), yy = fr.Y(y[j]); j ? ctx.lineTo(x,yy) : ctx.moveTo(x,yy); } ctx.stroke();
+  for(const r of findRuns(fl)){
+    const bY = fr.Y((r.side === 1 ? b.upper : b.lower) * f);
+    ctx.beginPath(); ctx.moveTo(fr.X(s.t[r.j0]), bY); for(let j=r.j0;j<=r.j1;j++) ctx.lineTo(fr.X(s.t[j]), fr.Y(y[j])); ctx.lineTo(fr.X(s.t[r.j1]), bY); ctx.closePath();
+    ctx.fillStyle = hexA(col.oob, .30); ctx.fill();
+  }
+  const dots = y.length <= 520;
+  for(let j=0;j<y.length;j++){
+    if(!dots && !fl[j]) continue;
+    ctx.beginPath(); ctx.arc(fr.X(s.t[j]), fr.Y(y[j]), fl[j] ? 3.2 : 2, 0, 6.2832); ctx.fillStyle = fl[j] ? col.oob : cc; ctx.fill();
+  }
+  const mark = (t, label, align) => {
+    const x = fr.X(t); ctx.save(); ctx.setLineDash([4,3]); ctx.strokeStyle = col.oob; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(x, M.t); ctx.lineTo(x, M.t+fr.ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = col.oob; ctx.font = '600 11px "IBM Plex Sans", system-ui, sans-serif'; ctx.textBaseline = 'top'; ctx.textAlign = align; ctx.fillText(label, x + (align === 'left' ? 5 : -5), M.t+4); ctx.restore();
+  };
+  mark(inc.start, `Goes out of bounds ${fmtHM(inc.start)}`, 'right');
+  if(inc.end != null) mark(inc.end, `Back in bounds ${fmtHM(inc.end)}`, 'left');
+  else { ctx.fillStyle = col.oob; ctx.font = '600 11px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText('Still out of bounds', W-M.r-4, M.t+4); }
+  if(m.hoverJ >= 0){
+    const j = m.hoverJ, x = fr.X(s.t[j]), yy = fr.Y(y[j]);
+    ctx.strokeStyle = col.muted; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(x, M.t); ctx.lineTo(x, M.t+fr.ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(x, yy, 6, 0, 6.2832); ctx.fillStyle = fl[j] ? col.oob : cc; ctx.fill(); ctx.strokeStyle = col.ink; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.restore();
+  m.fr = fr; m.y = y; m.fl = fl;
+  if(!m.bound){
+    m.bound = true;
+    m.cv.addEventListener('pointermove', e => {
+      const r = m.cv.getBoundingClientRect(), px = e.clientX - r.left; if(!m.fr) return;
+      const t = m.fr.inv(px), j = clamp(Math.round((t - m.s.t[0])/(m.k*STEP)), 0, m.s.t.length-1);
+      if(j !== m.hoverJ){ m.hoverJ = j; drawMini(id);
+        const rd = $(`[data-read="${CSS.escape(id)}"]`); if(rd) rd.textContent = `${fmtDT(m.s.t[j])}  ${fmtNum(m.y[j], state.settings.sig)} ${state.settings.unit}  ${m.fl[j] ? (m.fl[j] === 1 ? 'above upper bound' : 'below lower bound') : 'in range'}`; }
+    });
+    m.cv.addEventListener('pointerleave', () => { m.hoverJ = -1; drawMini(id); });
+  }
+}
+const editingNotes = new Set(), confirmingNotes = new Set();
+async function renderNotes(id){
+  const box = $(`[data-notes="${CSS.escape(id)}"]`); if(!box) return;
+  const notes = await api.getNotes(id);
+  if(!notes.length){
+    box.innerHTML = `<div class="empty" style="padding:10px;text-align:left">No notes yet. Add what happened and how it was fixed so the next engineer can find it.</div>`; return;
+  }
+  box.innerHTML = notes.slice().reverse().map(n => {
+    const meta = `${esc(n.author || 'Unknown')} · ${fmtDT(n.ts)}${n.editedTs ? ` · <span class="edited">edited ${fmtDT(n.editedTs)}</span>` : ''}`;
+    const a = `data-id="${esc(id)}" data-nid="${esc(n.nid)}"`;
+    if(editingNotes.has(n.nid)){
+      return `<div class="note editing"><div class="meta">${meta}</div><div class="note-form" style="margin-top:6px">
+        <input class="n-author" value="${esc(n.author || '')}" placeholder="Your name or ID" aria-label="Author">
+        <textarea class="n-what" placeholder="What happened?" aria-label="What happened">${esc(n.occurred || '')}</textarea>
+        <textarea class="n-fix" placeholder="How was it fixed?" aria-label="How it was fixed">${esc(n.fix || '')}</textarea>
+        <div class="note-actions"><button class="btn primary small" data-act="save-edit" ${a}>Save changes</button><button class="btn small" data-act="cancel-edit" ${a}>Cancel</button></div></div></div>`;
+    }
+    const actions = confirmingNotes.has(n.nid)
+      ? `<span class="confirm">Delete this note?</span><button class="btn small" data-act="confirm-del" ${a}>Delete</button><button class="btn small" data-act="cancel-del" ${a}>Cancel</button>`
+      : `<button class="linkbtn" data-act="edit-note" ${a}>Edit</button><button class="linkbtn danger" data-act="ask-del" ${a}>Delete</button>`;
+    return `<div class="note"><div class="meta">${meta}</div>
+      ${n.occurred ? `<p><b>What happened:</b> ${esc(n.occurred)}</p>` : ''}${n.fix ? `<p><b>Fix:</b> ${esc(n.fix)}</p>` : ''}
+      <div class="note-actions">${actions}</div></div>`;
+  }).join('');
+}
+async function updateNoteCount(id){
+  const c = (await api.getNoteCounts([id]))[id], cell = $(`[data-nc="${CSS.escape(id)}"]`);
+  if(cell) cell.textContent = c ? '📝 ' + c : '';
+}
+$('#incTable').addEventListener('click', async e => {
+  const act = e.target.closest('[data-act]');
+  if(act){
+    const id = act.dataset.id, inc = state.incMap.get(id);
+    if(act.dataset.act === 'open-graph' && inc){
+      state.machine = inc.machine; $('#machineSel').value = inc.machine; state.chOn = [inc.chamber]; buildChamberSeg(); renderLegend();
+      const d = incEnd(inc) - inc.start, pad = Math.max(2*3600000, d*.5);
+      setRange(inc.start - pad, Math.min(RET.end, (inc.end == null ? RET.end : inc.end) + pad), { silent:true, typed:true });
+      state.pins = []; switchTab('graph'); refreshFleet(); return;
+    }
+    const nid = act.dataset.nid, kind = act.dataset.act;
+    if(kind === 'edit-note'){ editingNotes.add(nid); confirmingNotes.delete(nid); await renderNotes(id); return; }
+    if(kind === 'cancel-edit'){ editingNotes.delete(nid); await renderNotes(id); return; }
+    if(kind === 'save-edit'){
+      const root = act.closest('.note-form'), author = $('.n-author', root).value.trim(), occurred = $('.n-what', root).value.trim(), fix = $('.n-fix', root).value.trim();
+      if(!occurred && !fix){ toast('A note needs some text. Use Delete to remove it.'); return; }
+      localSet('cdsem.engineer', author);
+      await api.updateNote(id, nid, { author, occurred, fix });
+      editingNotes.delete(nid); await renderNotes(id); toast('Note updated'); return;
+    }
+    if(kind === 'ask-del'){ confirmingNotes.add(nid); editingNotes.delete(nid); await renderNotes(id); return; }
+    if(kind === 'cancel-del'){ confirmingNotes.delete(nid); await renderNotes(id); return; }
+    if(kind === 'confirm-del'){
+      await api.deleteNote(id, nid); confirmingNotes.delete(nid);
+      await renderNotes(id); await updateNoteCount(id);
+      toast('Note deleted', { label:'Undo', fn:async () => { await api.restoreNote(id, nid); await renderNotes(id); await updateNoteCount(id); toast('Note restored'); } }, 7000);
+      return;
+    }
+    if(act.dataset.act === 'save-note'){
+      const root = act.closest('.note-form'), author = $('.n-author', root).value.trim(), occurred = $('.n-what', root).value.trim(), fix = $('.n-fix', root).value.trim();
+      if(!occurred && !fix){ toast('Write what happened or how it was fixed'); return; }
+      localSet('cdsem.engineer', author);
+      await api.addNote(id, { author, occurred, fix });
+      $('.n-what', root).value = ''; $('.n-fix', root).value = '';
+      await renderNotes(id); toast('Note saved');
+      const c = (await api.getNoteCounts([id]))[id]; const cell = $(`[data-nc="${CSS.escape(id)}"]`); if(cell) cell.textContent = c ? '📝 ' + c : '';
+      return;
+    }
+  }
+  if(e.target.closest('.detail')) return;
+  const grp = e.target.closest('tr.grp');
+  if(grp){ const k = grp.dataset.g; state.collapsed.has(k) ? state.collapsed.delete(k) : state.collapsed.add(k); renderIncidents(); return; }
+  const row = e.target.closest('tr.row');
+  if(row) toggleDetail(row);
+});
+$('#incTable').addEventListener('keydown', e => {
+  if((e.key === 'Enter' || e.key === ' ') && e.target.matches('tr.row')){ e.preventDefault(); toggleDetail(e.target); }
+});
+function toggleDetail(row){
+  const id = row.dataset.id, next = row.nextElementSibling;
+  if(state.openInc.has(id)){ state.openInc.delete(id); row.classList.remove('open'); if(next && next.classList.contains('detail')) next.remove(); minis.delete(id); }
+  else { state.openInc.add(id); row.classList.add('open'); row.insertAdjacentHTML('afterend', detailShell(state.incMap.get(id))); fillDetail(id); }
+}
+$('#incMore').onclick = () => { state.incShown += 60; renderIncidents(); };
+$('#incScope').addEventListener('change', e => { state.incScope = e.target.value; state.incShown = 60; renderIncidents(); });
+$('#incChamber').addEventListener('change', e => { state.incChamber = e.target.value; state.incShown = 60; renderIncidents(); });
+$('#incGroup').addEventListener('change', e => { state.incGroup = e.target.checked; state.incShown = 60; renderIncidents(); });
+$('#incFrom').addEventListener('change', e => { const t = new Date(e.target.value).getTime(); if(!isNaN(t)){ state.incFrom = t; renderIncidents(); } });
+$('#incTo').addEventListener('change', e => { const t = new Date(e.target.value).getTime(); if(!isNaN(t)){ state.incTo = t; renderIncidents(); } });
+$('#copyCsv').onclick = async () => {
+  const f = unitF(), u = state.settings.unit, head = ['incident_id','machine','chamber','date','start','end','duration_min',`peak_${u}`,'severity','ongoing'];
+  const lines = [head.join(',')].concat(state.incidents.map(i => [i.id, i.machine, chShort(i.chamber), fmtDateLong(i.start), fmtHM(i.start), i.end == null ? '' : fmtHM(i.end),
+    Math.round(i.durationMs/60000), (i.peak*f).toExponential(3), i.severity, i.ongoing].join(',')));
+  const text = lines.join('\n');
+  try{ await navigator.clipboard.writeText(text); toast(`Copied ${state.incidents.length} incidents`); }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand('copy'); }catch(_){} ta.remove(); toast(ok ? `Copied ${state.incidents.length} incidents` : 'Copy was blocked by the browser');
+  }
+};
+
+/* =====================================================================
+   FLEET + MACHINE PICKER
+   ===================================================================== */
+const fleetStatus = {};
+function buildMachineUI(){
+  const sel = $('#machineSel'); sel.innerHTML = '';
+  for(let m=1;m<=CONFIG.MACHINE_COUNT;m++) sel.insertAdjacentHTML('beforeend', `<option value="${m}">Machine ${m}</option>`);
+  sel.value = state.machine;
+  $('#fleetList').innerHTML = Array.from({length:CONFIG.MACHINE_COUNT}, (_,i) => i+1).map(m =>
+    `<button class="fl" data-m="${m}" aria-current="${m === state.machine}"><span class="dot"></span><span>Machine ${m}</span><small>…</small></button>`).join('');
+  const cOpts = ['<option value="all">All chambers</option>'].concat(chambers().map(c => `<option value="${c}">${esc(chName(c))}</option>`));
+  $('#incChamber').innerHTML = cOpts.join('');
+}
+async function refreshFleet(){
+  const B = allBounds(); let alerts = 0, warns = 0;
+  for(let m=1;m<=CONFIG.MACHINE_COUNT;m++){
+    api.warm(m); const s = await api.getFleetStatus(m, B); fleetStatus[m] = s;
+    const el = $(`.fl[data-m="${m}"]`); if(!el) continue;
+    el.className = 'fl ' + (s.oobNow ? 'alert' : s.incidents24h ? 'warn' : 'ok');
+    $('small', el).textContent = s.oobNow ? 'Out of bounds' : s.incidents24h ? `${s.incidents24h} in 24 h` : 'OK';
+    el.setAttribute('aria-current', String(m === state.machine));
+    if(s.oobNow) alerts++; else if(s.incidents24h) warns++;
+    if(m % 8 === 0) await new Promise(r => setTimeout(r, 0));
+  }
+  $('#fleetSum').textContent = `${alerts} out of bounds now · ${warns} with incidents in 24 h`;
+}
+function selectMachine(m){
+  m = clamp(m, 1, CONFIG.MACHINE_COUNT); if(m === state.machine) return;
+  state.machine = m; $('#machineSel').value = m; state.pins = []; state.openInc.clear(); state.collapsed.clear(); state.incShown = 60; minis.clear();
+  $$('.fl').forEach(el => el.setAttribute('aria-current', String(+el.dataset.m === m)));
+  refreshIncBadge(); refreshActive();
+}
+$('#machineSel').addEventListener('change', e => selectMachine(+e.target.value));
+$('#prevM').onclick = () => selectMachine(state.machine - 1);
+$('#nextM').onclick = () => selectMachine(state.machine + 1);
+$('#fleetList').addEventListener('click', e => { const b = e.target.closest('.fl'); if(b) selectMachine(+b.dataset.m); });
+$('#fleetFilter').addEventListener('input', e => {
+  const q = e.target.value.trim();
+  $$('.fl').forEach(el => { el.hidden = q && !String(el.dataset.m).startsWith(q); });
+});
+
+/* =====================================================================
+   TABS + BOOT
+   ===================================================================== */
+function switchTab(tab){
+  state.tab = tab;
+  for(const t of ['graph','stats','inc']){
+    $('#tab-'+t).hidden = t !== tab; $('#t-'+t).setAttribute('aria-selected', String(t === tab));
+  }
+  refreshActive();
+}
+function refreshActive(){
+  if(state.tab === 'graph'){ syncRangeInputs(); renderLegend(); renderBoundChip(); lastPinSig = ''; scheduleRefresh(); }
+  else if(state.tab === 'stats') renderStats();
+  else { $('#incFrom').value = toLocalInput(state.incFrom); $('#incTo').value = toLocalInput(state.incTo); renderIncidents(); }
+}
+$$('.tab').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+let resizeT;
+new ResizeObserver(() => { clearTimeout(resizeT); resizeT = setTimeout(() => {
+  if(state.tab === 'graph' && !!state.geom) drawMain();
+  if(state.tab === 'stats') drawTrend(statsWindow());
+  minis.forEach((_, id) => drawMini(id));
+}, 60); }).observe(document.body);
+const redrawTheme = () => { buildChamberSeg(); renderBoundChip(); renderLegend(); if(state.tab === 'graph' && !!state.geom) drawMain(); if(state.tab === 'stats') renderStats(); minis.forEach((_, id) => drawMini(id)); };
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawTheme);
+new MutationObserver(redrawTheme).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
+
+buildMachineUI(); buildChamberSeg(); renderBoundChip(); syncRangeInputs();
+refreshFleet(); refreshIncBadge(); refreshActive();
+</script>
+</body>
+</html>
