@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vacuum monitor demo</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef1f5; --panel:#ffffff; --panel2:#f6f8fb; --ink:#13202f; --muted:#5d6b7c; --line:#d9e0e8;
+  --accent:#1c4fd6; --accent-ink:#ffffff; --bad:#d8321a; --oob:#5a2fd0; --ok:#17803a; --warn:#b97400;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c1118; --panel:#141b25; --panel2:#101720; --ink:#e6ebf2; --muted:#8c99ab; --line:#263243;
+    --accent:#7ea2ff; --accent-ink:#0c1118; --bad:#ff6a52; --oob:#a98cff; --ok:#4fc873; --warn:#f3b13a;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c1118; --panel:#141b25; --panel2:#101720; --ink:#e6ebf2; --muted:#8c99ab; --line:#263243;
+  --accent:#7ea2ff; --accent-ink:#0c1118; --bad:#ff6a52; --oob:#a98cff; --ok:#4fc873; --warn:#f3b13a;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{max-width:1080px;margin:0 auto;padding:14px 16px 40px}
+
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 0 14px}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;color:var(--accent)}
+.brand h1{margin:0;font-size:18px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.brand p{margin:0;font-size:13px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:13px}
+.pill .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.pill[data-kind="good"] .dot{background:var(--ok)}
+.pill[data-kind="bad"] .dot{background:var(--bad)}
+.pill[data-kind="sim"] .dot{background:var(--warn)}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{padding:7px 13px;border:1px solid var(--line);border-radius:7px;background:var(--panel);font-size:14px}
+.btn:hover{border-color:var(--accent)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.iconbtn{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:7px;background:var(--panel);font-size:17px}
+.iconbtn:hover{border-color:var(--accent)}
+.notice{margin:0 0 12px;padding:10px 14px;border:1px solid var(--warn);border-radius:8px;background:color-mix(in srgb,var(--warn) 10%,var(--panel));font-size:14px}
+.notice.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,var(--panel))}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tab{padding:9px 16px;border:0;border-bottom:3px solid transparent;background:none;font-weight:500;color:var(--muted)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.badge{display:inline-block;min-width:20px;margin-left:8px;padding:0 6px;border-radius:10px;background:var(--bad);color:#fff;font-size:12px;line-height:20px;text-align:center}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;padding:20px 24px;margin-bottom:14px;align-items:center}
+.rlabel{font-size:14px;color:var(--muted)}
+.rvalue{display:flex;align-items:baseline;gap:10px;line-height:1.05;margin:2px 0 8px}
+.rvalue .num{font-size:clamp(52px,9vw,86px);font-weight:500;letter-spacing:-.03em}
+.rvalue .unit{font-size:20px;color:var(--muted)}
+.hero[data-state="bad"] .num{color:var(--bad)}
+.hero[data-state="stale"] .num,.hero[data-state="wait"] .num{color:var(--muted)}
+.status{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-weight:500;font-size:15px;border:1px solid var(--line);background:var(--panel2)}
+.status .sdot{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.hero[data-state="good"] .status{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 11%,var(--panel))}
+.hero[data-state="good"] .sdot{background:var(--ok)}
+.hero[data-state="bad"] .status{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--panel))}
+.hero[data-state="bad"] .sdot{background:var(--bad)}
+.hero[data-state="warn"] .status,.hero[data-state="error"] .status,.hero[data-state="start"] .status{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 11%,var(--panel))}
+.hero[data-state="warn"] .sdot,.hero[data-state="error"] .sdot,.hero[data-state="start"] .sdot{background:var(--warn)}
+.rsub{margin:8px 0 0;color:var(--muted);font-size:14px}
+.rnote{margin:2px 0 0;color:var(--muted);font-size:13px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}
+.stats div{padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}
+.stats dt{font-size:13px;color:var(--muted)}
+.stats dd{margin:2px 0 0;font-size:24px;font-weight:500}
+.stats dd small{font-size:13px;font-weight:400;color:var(--muted);margin-left:4px}
+
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line)}
+.spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg label{position:relative}
+.seg input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.seg span{display:block;padding:5px 12px;font-size:13px;background:var(--panel)}
+.seg input:checked + span{background:var(--accent);color:var(--accent-ink)}
+.seg input:focus-visible + span{outline:2px solid var(--accent);outline-offset:-2px}
+.chart-wrap{position:relative;padding:8px 8px 0}
+canvas{display:block;width:100%}
+#chart{height:340px;touch-action:pan-y}
+.mini{height:190px}
+.tip{position:absolute;z-index:2;pointer-events:none;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel);font-size:13px;line-height:1.4;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap}
+.tip b{font-weight:600}
+.chip{display:inline-block;margin-top:3px;padding:0 8px;border-radius:999px;font-size:12px;color:#fff;background:var(--ok)}
+.chip.bad{background:var(--oob)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;padding:6px 16px 4px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:22px;height:0;border-top:3px solid var(--accent);vertical-align:middle;margin-right:6px}
+.legend i.o{border-top-color:var(--oob)}
+.legend i.d{border-top:2px dashed var(--bad)}
+.legend i.z{height:11px;border:0;background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.hint{margin:0;padding:6px 16px 14px;font-size:13px;color:var(--muted)}
+
+.sumtext{font-size:14px}
+.tablewrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:500;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.detail td{background:var(--panel2);padding:16px 18px}
+.rowbtn{display:inline-flex;align-items:center;gap:8px;padding:0;border:0;background:none;font-weight:500}
+.rowbtn .car{display:inline-block;transition:transform .15s}
+.rowbtn[aria-expanded="true"] .car{transform:rotate(90deg)}
+.state-on{color:var(--bad);font-weight:500}
+.state-off{color:var(--muted)}
+.dgrid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:22px}
+.dgrid h4{margin:0 0 8px;font-size:14px;font-weight:600}
+.notes{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:230px;overflow:auto}
+.note{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel);font-size:14px}
+.note .meta{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;margin-bottom:2px}
+.note .body{white-space:pre-wrap;overflow-wrap:anywhere}
+.note button{border:0;background:none;color:var(--muted);font-size:12px;padding:0}
+.note button:hover{color:var(--bad)}
+.noteform{display:grid;gap:8px}
+.noteform input,.noteform textarea{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
+.noteform textarea{min-height:70px;resize:vertical}
+.empty{padding:28px 18px;text-align:center;color:var(--muted)}
+
+dialog{width:min(520px,calc(100vw - 24px));padding:0;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink)}
+dialog::backdrop{background:rgba(10,16,24,.5)}
+.dlg-h{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.dlg-h h2{margin:0;font-size:17px;font-weight:600}
+.dlg-b{padding:6px 18px 10px;max-height:min(70vh,640px);overflow:auto}
+.dlg-f{display:flex;gap:8px;align-items:center;padding:12px 18px;border-top:1px solid var(--line)}
+fieldset{margin:12px 0;padding:0;border:0}
+legend{padding:0;margin-bottom:6px;font-weight:600;font-size:14px}
+.field{display:grid;gap:4px;margin-bottom:12px}
+.field label{font-size:14px}
+.field input[type=text],.field input[type=number],.field select{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
+.field small{color:var(--muted);font-size:12.5px}
+.field.check{grid-template-columns:auto 1fr;align-items:start;column-gap:8px}
+.field.check small{grid-column:2}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);padding:9px 16px;border-radius:8px;background:var(--ink);color:var(--bg);font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}
+.toast.on{opacity:1;transform:translateX(-50%)}
+@media (max-width:760px){
+  .hero{grid-template-columns:1fr;padding:16px}
+  .dgrid{grid-template-columns:1fr}
+  #chart{height:280px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 20 C10 20 11 9 15 9 S20 20 24 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <div><h1>Vacuum monitor demo</h1><p>Live pressure from the test bench</p></div>
+    </div>
+    <span class="pill" id="pill" data-kind="sim"><span class="dot"></span><span id="pillText">Simulator</span></span>
+    <div class="actions">
+      <button class="btn" id="saveBtn" title="Download this session as a JSON file">Save session</button>
+      <button class="btn" id="loadBtn" title="Open a session you saved earlier">Load session</button>
+      <button class="btn" id="newBtn" title="Clear everything and start from zero">New session</button>
+      <button class="iconbtn" id="openSettings" aria-label="Settings" title="Settings">&#9881;</button>
+    </div>
+    <input type="file" id="fileIn" accept="application/json,.json" hidden>
+  </header>
+  <div class="notice" id="notice" hidden></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-live" aria-selected="true" aria-controls="tab-live">Live</button>
+    <button class="tab" role="tab" id="t-events" aria-selected="false" aria-controls="tab-events">Events<span class="badge" id="evBadge" hidden>0</span></button>
+  </div>
+
+  <section id="tab-live" aria-labelledby="t-live">
+    <div class="card hero" id="hero" data-state="wait">
+      <div>
+        <div class="rlabel">Vacuum strength</div>
+        <div class="rvalue"><span class="num" id="bigVal">&mdash;</span><span class="unit" id="bigUnit">kPa</span></div>
+        <div class="status"><span class="sdot"></span><span id="statusText">Waiting for data</span></div>
+        <p class="rsub" id="statusSub"></p>
+        <p class="rnote" id="rnote"></p>
+      </div>
+      <dl class="stats">
+        <div><dt>Lowest</dt><dd id="stMin">&mdash;</dd></div>
+        <div><dt>Highest</dt><dd id="stMax">&mdash;</dd></div>
+        <div><dt>Average</dt><dd id="stAvg">&mdash;</dd></div>
+        <div><dt>Time out of bounds</dt><dd id="stOob">0 s</dd></div>
+      </dl>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="seg" role="radiogroup" aria-label="Time window" id="winSeg">
+          <label><input type="radio" name="win" value="60"><span>1 min</span></label>
+          <label><input type="radio" name="win" value="300"><span>5 min</span></label>
+          <label><input type="radio" name="win" value="900"><span>15 min</span></label>
+          <label><input type="radio" name="win" value="0"><span>Whole session</span></label>
+        </div>
+        <span class="spacer"></span>
+        <button class="btn small" id="simLeak" hidden>Simulate a leak</button>
+        <button class="btn small" id="freezeBtn" aria-pressed="false" title="Stop the graph from scrolling. Readings keep being recorded.">Freeze graph</button>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <canvas id="chart" role="img" aria-label="Vacuum strength over time. Hover to read exact values."></canvas>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <p class="hint">Hover the graph to read exact values. When the line drops into the shaded zone for long enough, an event is recorded.</p>
+    </div>
+  </section>
+
+  <section id="tab-events" hidden aria-labelledby="t-events">
+    <div class="card">
+      <div class="toolbar">
+        <div class="sumtext" id="evSum"></div>
+        <span class="spacer"></span>
+        <button class="btn small" id="copyCsv">Copy as CSV</button>
+      </div>
+      <div class="tablewrap"><table id="evTable"></table></div>
+      <div class="empty" id="evEmpty" hidden></div>
+    </div>
+  </section>
+</div>
+
+<dialog id="settings" aria-labelledby="setTitle">
+  <div class="dlg-h"><h2 id="setTitle">Settings</h2><button class="iconbtn" id="setClose" aria-label="Close">&times;</button></div>
+  <div class="dlg-b">
+    <fieldset>
+      <legend>Where readings come from</legend>
+      <div class="field"><label for="sSource">Data source</label>
+        <select id="sSource"><option value="sim">Simulator (no hardware needed)</option><option value="wifi">ESP32 over Wi-Fi</option></select></div>
+      <div class="field" id="hostField"><label for="sHost">ESP32 address</label>
+        <input type="text" id="sHost" placeholder="for example 192.168.1.42 or vacuum.local" autocomplete="off" spellcheck="false">
+        <small>The ESP32 prints its address in the Serial Monitor after it joins Wi-Fi. The laptop must be on the same network.</small></div>
+    </fieldset>
+    <fieldset>
+      <legend>Out of bounds</legend>
+      <div class="field"><label for="sThr">Threshold (<span id="thrUnit">kPa</span>)</label>
+        <input type="number" id="sThr" step="any" min="0">
+        <small>An event starts when vacuum strength stays below this value. It applies to new readings; existing events are kept.</small></div>
+      <div class="field"><label for="sStart">Seconds below the threshold before an event starts</label>
+        <input type="number" id="sStart" min="0" max="60" step="1"></div>
+      <div class="field"><label for="sEnd">Seconds back above the threshold before an event ends</label>
+        <input type="number" id="sEnd" min="0" max="60" step="1">
+        <small>Higher values stop brief noise from creating many small events.</small></div>
+      <div class="field check"><input type="checkbox" id="sWait"><label for="sWait">Wait for the first good reading before watching</label>
+        <small>Avoids a false event at start-up, while the pump is still pulling down.</small></div>
+    </fieldset>
+    <fieldset>
+      <legend>Display</legend>
+      <div class="field"><label for="sUnit">Units</label>
+        <select id="sUnit"><option value="kPa">kPa</option><option value="Torr">Torr</option><option value="mbar">mbar</option></select></div>
+      <div class="field"><label for="sSmooth">Big number</label>
+        <select id="sSmooth"><option value="0">Show each reading</option><option value="3">Average of the last 3 readings</option></select></div>
+      <div class="field"><label for="sKeep">Keep readings for</label>
+        <select id="sKeep"><option value="3600">1 hour</option><option value="14400">4 hours</option><option value="43200">12 hours</option></select>
+        <small>Older readings are dropped. Events and notes are kept.</small></div>
+      <div class="field"><label for="sTheme">Theme</label>
+        <select id="sTheme"><option value="auto">Match my device</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+    </fieldset>
+  </div>
+  <div class="dlg-f">
+    <button class="btn" id="setReset">Restore defaults</button>
+    <span class="spacer"></span>
+    <button class="btn" id="setCancel">Cancel</button>
+    <button class="btn primary" id="setApply">Apply</button>
+  </div>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ==== CORE START (no browser APIs below this line until CORE END) ==== */
+'use strict';
+const GAP_MS = 30000;      // no readings for this long closes an open event
+const GAP_BREAK = 5000;    // the graph line breaks across gaps longer than this
+const PRE_ROLL = 30000;    // seconds of graph kept before an event
+const POST_ROLL = 30000;   // seconds of graph kept after an event
+const TRACE_MAX = 1500;
+
+const UNITS = {
+  kPa:  { f:1,       dec:1, label:'kPa'  },
+  Torr: { f:7.50062, dec:0, label:'Torr' },
+  mbar: { f:10,      dec:0, label:'mbar' }
+};
+const DEFAULTS = {
+  source:'sim', host:'', unit:'kPa', thresholdKpa:60, startDelay:2, endDelay:2,
+  windowSec:300, smoothing:0, keepSec:3600, waitForGood:true, theme:'auto', author:''
+};
+let settings = Object.assign({}, DEFAULTS);
+const hooks = { eventsChanged(){}, dirty(){} };
+
+const S = { T:[], K:[], events:[], agg:{ n:0, sum:0, min:null, max:null }, armed:false, nextNo:1 };
+const det = { beyondSince:null, backSince:null, open:null };
+
+const pad2 = n => String(n).padStart(2, '0');
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+function resetSession(){
+  S.T = []; S.K = []; S.events = [];
+  S.agg = { n:0, sum:0, min:null, max:null };
+  S.armed = false; S.nextNo = 1;
+  det.beyondSince = null; det.backSince = null; det.open = null;
+}
+function lowerBound(a, x){ let lo = 0, hi = a.length; while(lo < hi){ const m = (lo + hi) >> 1; if(a[m] < x) lo = m + 1; else hi = m; } return lo; }
+function upperBound(a, x){ let lo = 0, hi = a.length; while(lo < hi){ const m = (lo + hi) >> 1; if(a[m] <= x) lo = m + 1; else hi = m; } return lo; }
+function nearestIdx(a, x){
+  if(!a.length) return -1;
+  const i = lowerBound(a, x);
+  if(i === 0) return 0;
+  if(i >= a.length) return a.length - 1;
+  return (x - a[i-1] <= a[i] - x) ? i - 1 : i;
+}
+
+function fmtVal(k, unit){ const u = UNITS[unit || settings.unit]; return (k * u.f).toFixed(u.dec); }
+function fmtDur(ms){
+  const s = Math.max(0, Math.round(ms / 1000));
+  if(s < 60) return s + ' s';
+  const m = Math.floor(s / 60), r = s % 60;
+  if(m < 60) return m + ' min ' + r + ' s';
+  const h = Math.floor(m / 60);
+  return h + ' h ' + (m % 60) + ' min';
+}
+function fmtClock(t){ const d = new Date(t); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()); }
+function fmtStamp(t){
+  const d = new Date(t);
+  return d.toLocaleDateString([], { month:'short', day:'numeric' }) + ', ' + fmtClock(t);
+}
+
+function lastT(){ return S.T.length ? S.T[S.T.length - 1] : null; }
+function displayK(){
+  const n = S.K.length; if(!n) return null;
+  const w = Math.min(settings.smoothing || 1, n);
+  let s = 0; for(let i = n - w; i < n; i++) s += S.K[i];
+  return s / w;
+}
+function oobMs(){
+  let s = 0; const lt = lastT();
+  for(const e of S.events) s += (e.endT === null ? (lt === null ? e.startT : lt) : e.endT) - e.startT;
+  return Math.max(0, s);
+}
+
+function thinTrace(ev){
+  const n = ev.trace.length;
+  ev.trace = ev.trace.filter((_, i) => i % 2 === 0 || i === n - 1);
+}
+function trimReadings(){
+  const lt = lastT(); if(lt === null) return;
+  const cut = lowerBound(S.T, lt - settings.keepSec * 1000);
+  if(cut > 300){ S.T.splice(0, cut); S.K.splice(0, cut); }
+}
+
+function openEvent(startT, nowT, k){
+  const ev = { no:S.nextNo, id:'E' + S.nextNo, startT, endT:null, postUntil:0, minK:k, minT:nowT, trace:[], notes:[] };
+  S.nextNo++;
+  const i0 = lowerBound(S.T, startT - PRE_ROLL);
+  for(let i = i0; i < S.T.length; i++){
+    ev.trace.push([S.T[i], S.K[i]]);
+    if(S.T[i] >= startT && S.K[i] < ev.minK){ ev.minK = S.K[i]; ev.minT = S.T[i]; }
+  }
+  while(ev.trace.length > TRACE_MAX) thinTrace(ev);
+  S.events.push(ev);
+  det.open = ev; det.backSince = null;
+  hooks.eventsChanged();
+}
+function closeEvent(ev, endT){
+  ev.endT = endT; ev.postUntil = endT + POST_ROLL;
+  if(det.open === ev) det.open = null;
+  det.beyondSince = null; det.backSince = null;
+  hooks.eventsChanged();
+}
+function closeOpen(t){ if(det.open) closeEvent(det.open, t); }
+
+function detect(t, k){
+  const bad = k < settings.thresholdKpa;
+  if(!S.armed){
+    if(settings.waitForGood && bad) return;
+    S.armed = true;
+  }
+  if(!det.open){
+    if(bad){
+      if(det.beyondSince === null) det.beyondSince = t;
+      if(t - det.beyondSince >= settings.startDelay * 1000) openEvent(det.beyondSince, t, k);
+    } else det.beyondSince = null;
+  } else {
+    const ev = det.open;
+    if(k < ev.minK){ ev.minK = k; ev.minT = t; }
+    if(bad) det.backSince = null;
+    else {
+      if(det.backSince === null) det.backSince = t;
+      if(t - det.backSince >= settings.endDelay * 1000) closeEvent(ev, det.backSince);
+    }
+  }
+}
+
+function ingest(t, k){
+  const n = S.T.length;
+  if(n){
+    const last = S.T[n - 1];
+    if(t <= last) t = last + 1;
+    if(t - last > GAP_MS){ closeOpen(last); det.beyondSince = null; det.backSince = null; }
+  }
+  S.T.push(t); S.K.push(k);
+  const a = S.agg; a.n++; a.sum += k;
+  a.min = a.min === null ? k : Math.min(a.min, k);
+  a.max = a.max === null ? k : Math.max(a.max, k);
+  for(let i = S.events.length - 1, c = 0; i >= 0 && c < 5; i--, c++){
+    const ev = S.events[i];
+    if(ev.endT === null || t <= ev.postUntil){
+      ev.trace.push([t, k]);
+      if(ev.trace.length > TRACE_MAX) thinTrace(ev);
+    }
+  }
+  detect(t, k);
+  trimReadings();
+  hooks.dirty();
+}
+
+function sessionObj(){
+  return {
+    app:'vacuum-demo', version:1, savedAt:new Date().toISOString(),
+    thresholdKpa:settings.thresholdKpa,
+    agg:S.agg, armed:S.armed, nextNo:S.nextNo,
+    events:S.events.map(e => ({ no:e.no, startT:e.startT, endT:e.endT, minK:e.minK, minT:e.minT, trace:e.trace, notes:e.notes })),
+    readings:{ t:S.T, k:S.K.map(v => Math.round(v * 1000) / 1000) }
+  };
+}
+function parseSession(o){
+  const bad = m => ({ ok:false, error:m });
+  if(!o || o.app !== 'vacuum-demo') return bad('This file is not a vacuum demo session.');
+  if(o.version !== 1) return bad('This session was saved by a different version of the page.');
+  const r = o.readings;
+  if(!r || !Array.isArray(r.t) || !Array.isArray(r.k) || r.t.length !== r.k.length) return bad('The readings in this file are damaged.');
+  if(r.t.length > 200000) return bad('This session is too large to open.');
+  for(let i = 0; i < r.t.length; i++){
+    if(!Number.isFinite(r.t[i]) || !Number.isFinite(r.k[i]) || (i && r.t[i] <= r.t[i-1])) return bad('The readings in this file are damaged or out of order.');
+  }
+  if(!Array.isArray(o.events)) return bad('The events in this file are damaged.');
+  const events = []; let maxNo = 0;
+  for(const e of o.events){
+    if(!e || !Number.isFinite(e.startT) || !(e.endT === null || Number.isFinite(e.endT)) || !Number.isFinite(e.minK)) return bad('An event in this file is damaged.');
+    const no = Number.isInteger(e.no) && e.no > 0 ? e.no : events.length + 1;
+    maxNo = Math.max(maxNo, no);
+    const trace = Array.isArray(e.trace)
+      ? e.trace.filter(p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])).slice(0, TRACE_MAX * 2).map(p => [p[0], p[1]])
+      : [];
+    const notes = Array.isArray(e.notes)
+      ? e.notes.filter(n => n && typeof n.text === 'string').slice(0, 200).map(n => ({
+          id:String(n.id || Math.random().toString(36).slice(2)).slice(0, 40),
+          author:String(n.author || '').slice(0, 80), text:n.text.slice(0, 2000), ts:Number.isFinite(n.ts) ? n.ts : 0 }))
+      : [];
+    events.push({ no, id:'E' + no, startT:e.startT, endT:e.endT, postUntil:e.endT === null ? 0 : e.endT + POST_ROLL,
+                  minK:e.minK, minT:Number.isFinite(e.minT) ? e.minT : e.startT, trace, notes });
+  }
+  events.sort((a, b) => a.startT - b.startT);
+  let agg = o.agg;
+  if(!agg || !Number.isFinite(agg.n) || !Number.isFinite(agg.sum) || agg.n < r.k.length){
+    agg = { n:r.k.length, sum:r.k.reduce((s, v) => s + v, 0), min:null, max:null };
+    if(r.k.length){ agg.min = Math.min(...r.k); agg.max = Math.max(...r.k); }
+  } else agg = { n:agg.n, sum:agg.sum, min:Number.isFinite(agg.min) ? agg.min : null, max:Number.isFinite(agg.max) ? agg.max : null };
+  const nextNo = Math.max(Number.isInteger(o.nextNo) ? o.nextNo : 1, maxNo + 1);
+  return { ok:true, data:{ T:r.t.slice(), K:r.k.slice(), events, agg, armed:!!o.armed, nextNo } };
+}
+function applySession(d){
+  resetSession();
+  S.T = d.T; S.K = d.K; S.events = d.events; S.agg = d.agg; S.armed = d.armed; S.nextNo = d.nextNo;
+  const lt = lastT();
+  for(const e of S.events){
+    if(e.endT === null){ e.endT = lt === null ? e.startT : Math.max(lt, e.startT); e.postUntil = e.endT; }
+  }
+}
+
+function parsePoll(d, arrival, since){
+  const out = { ok:false, readings:[], errors:[], maxSeq:since, boot:null };
+  if(!d || !Array.isArray(d.readings) || !Number.isFinite(d.now_ms)) return out;
+  out.ok = true; out.boot = d.boot;
+  for(const r of d.readings){
+    if(!r || !Number.isFinite(r.seq) || r.seq <= since) continue;
+    let age = Number.isFinite(r.t_ms) ? ((d.now_ms - r.t_ms) >>> 0) : 0;
+    if(age > 3600000) age = 0;
+    const t = arrival - age;
+    if(typeof r.err === 'string') out.errors.push({ t, msg:r.err });
+    else if(Number.isFinite(r.kpa)) out.readings.push({ t, k:r.kpa });
+    if(r.seq > out.maxSeq) out.maxSeq = r.seq;
+  }
+  return out;
+}
+function cleanHost(s){
+  s = String(s || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+  return /^[A-Za-z0-9.\-]+(:\d{1,5})?$/.test(s) ? s : '';
+}
+
+const sim = { value:0, target:73.5, leakUntil:0, nextLeakAt:0 };
+function simReset(startValue, now){ sim.value = startValue; sim.target = 73.5; sim.leakUntil = 0; sim.nextLeakAt = now + (45 + Math.random() * 60) * 1000; }
+function simLeak(sec, now){ sim.leakUntil = now + sec * 1000; sim.target = 18 + Math.random() * 20; }
+function simStep(now){
+  if(sim.leakUntil && now > sim.leakUntil){ sim.leakUntil = 0; sim.target = 73.5; sim.nextLeakAt = now + (60 + Math.random() * 90) * 1000; }
+  else if(!sim.leakUntil && now > sim.nextLeakAt) simLeak(8 + Math.random() * 14, now);
+  sim.value += (sim.target - sim.value) * (sim.leakUntil ? 0.25 : 0.12);
+  const noise = (Math.random() + Math.random() - 1) * 0.5;
+  return clamp(sim.value + noise, -1, 100);
+}
+
+function eventsCsv(){
+  const q = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const lt = lastT();
+  const rows = [['Event', 'Started', 'Ended', 'Duration (s)', 'Lowest vacuum (' + settings.unit + ')', 'Notes'].map(q).join(',')];
+  for(const e of S.events){
+    const end = e.endT === null ? lt : e.endT;
+    rows.push([
+      q('Event ' + e.no), q(new Date(e.startT).toISOString()), q(e.endT === null ? 'ongoing' : new Date(e.endT).toISOString()),
+      (((end === null ? e.startT : end) - e.startT) / 1000).toFixed(1), fmtVal(e.minK),
+      q(e.notes.map(n => (n.author ? n.author + ': ' : '') + n.text).join(' | '))
+    ].join(','));
+  }
+  return rows.join('\n');
+}
+/* ==== CORE END ==== */
+
+/* ===================== browser code ===================== */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const SKEY = 'vacuumDemo.settings.v1', DKEY = 'vacuumDemo.session.v1';
+const ui = { tab:'live', frozen:false, frozenRange:null, expanded:new Set(), drafts:{}, lastErr:null, hoverT:null, raf:false, quotaWarned:false };
+let dirty = false;
+
+function loadSettings(){
+  try{
+    const s = JSON.parse(localStorage.getItem(SKEY) || '{}');
+    const out = Object.assign({}, DEFAULTS);
+    for(const k of Object.keys(DEFAULTS)){
+      if(typeof s[k] === typeof DEFAULTS[k]) out[k] = s[k];
+    }
+    if(!UNITS[out.unit]) out.unit = 'kPa';
+    if(!Number.isFinite(out.thresholdKpa) || out.thresholdKpa <= 0) out.thresholdKpa = DEFAULTS.thresholdKpa;
+    if(![60, 300, 900, 0].includes(out.windowSec)) out.windowSec = 300;
+    if(![3600, 14400, 43200].includes(out.keepSec)) out.keepSec = 3600;
+    if(!['sim', 'wifi'].includes(out.source)) out.source = 'sim';
+    if(!['auto', 'light', 'dark'].includes(out.theme)) out.theme = 'auto';
+    return out;
+  }catch(e){ return Object.assign({}, DEFAULTS); }
+}
+function saveSettings(){ try{ localStorage.setItem(SKEY, JSON.stringify(settings)); }catch(e){} }
+function applyTheme(){ document.documentElement.dataset.theme = settings.theme === 'auto' ? '' : settings.theme; }
+
+let toastTimer = null;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2600);
+}
+function showNotice(msg, kind){ const n = $('#notice'); n.textContent = msg; n.className = 'notice' + (kind ? ' ' + kind : ''); n.hidden = false; }
+function hideNotice(){ $('#notice').hidden = true; }
+
+/* ---------- saving ---------- */
+function saveSession(){
+  try{
+    localStorage.setItem(DKEY, JSON.stringify(sessionObj()));
+    dirty = false; ui.quotaWarned = false;
+  }catch(e){
+    if(!ui.quotaWarned){ ui.quotaWarned = true; showNotice('The browser has no more room to autosave. Use Save session to keep your data, or choose a shorter “Keep readings for” time in Settings.', 'bad'); }
+  }
+}
+function restoreSession(){
+  try{
+    const raw = localStorage.getItem(DKEY); if(!raw) return;
+    const p = parseSession(JSON.parse(raw));
+    if(p.ok) applySession(p.data);
+  }catch(e){}
+}
+hooks.dirty = () => { dirty = true; };
+hooks.eventsChanged = () => {
+  saveSession(); updateBadge();
+  if(ui.tab === 'events') renderEvents();
+};
+
+function downloadSession(){
+  const blob = new Blob([JSON.stringify(sessionObj())], { type:'application/json' });
+  const d = new Date();
+  const name = 'vacuum-session-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Session saved as ' + name);
+}
+function loadSessionFile(file){
+  const rd = new FileReader();
+  rd.onload = () => {
+    let o; try{ o = JSON.parse(rd.result); }catch(e){ toast('That file could not be read as JSON.'); return; }
+    const p = parseSession(o);
+    if(!p.ok){ toast(p.error); return; }
+    if(S.T.length && !confirm('Replace the current session with the one in this file?')) return;
+    applySession(p.data); saveSession(); renderAll(); toast('Session loaded');
+  };
+  rd.onerror = () => toast('That file could not be opened.');
+  rd.readAsText(file);
+}
+function newSession(){
+  if(S.T.length || S.events.length){
+    if(!confirm('Start a new session? This clears all readings, events and notes. Save the session first if you want to keep it.')) return;
+  }
+  resetSession(); ui.expanded.clear(); ui.drafts = {}; ui.lastErr = null;
+  if(settings.source === 'sim') simReset(0, Date.now());
+  saveSession(); renderAll(); toast('Started a new session');
+}
+
+/* ---------- connection ---------- */
+function setConn(kind, text){ const p = $('#pill'); p.dataset.kind = kind; $('#pillText').textContent = text; }
+let simTimer = null;
+const net = { timer:null, since:0, boot:null, busy:false, fails:0 };
+function stopSources(){ clearInterval(simTimer); simTimer = null; clearInterval(net.timer); net.timer = null; $('#simLeak').hidden = true; }
+function startSource(){
+  stopSources(); hideNotice(); ui.lastErr = null;
+  if(settings.source === 'sim'){
+    const last = S.K.length ? S.K[S.K.length - 1] : 0;
+    simReset(last, Date.now());
+    setConn('sim', 'Simulator');
+    $('#simLeak').hidden = false;
+    const simTick = () => { const now = Date.now(); ingest(now, simStep(now)); scheduleRender(); };
+    simTimer = setInterval(simTick, 1000);
+    simTick();
+    return;
+  }
+  const host = cleanHost(settings.host);
+  if(!host){ setConn('wait', 'Enter the ESP32 address'); showNotice('Open Settings and enter the ESP32 address (it is printed in the Serial Monitor), or switch the data source to the simulator.'); scheduleRender(); return; }
+  if(location.protocol === 'https:'){ setConn('bad', 'Blocked by the browser'); showNotice('This page was opened over https, so the browser blocks it from reaching the ESP32. Open the saved vacuum_demo.html file from your computer instead.', 'bad'); return; }
+  net.since = 0; net.boot = null; net.fails = 0; net.busy = false;
+  setConn('wait', 'Connecting to ' + host + '…');
+  net.timer = setInterval(pollEsp, 1000); pollEsp();
+}
+async function pollEsp(){
+  if(net.busy) return; net.busy = true;
+  const host = cleanHost(settings.host);
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 2500);
+  try{
+    const r = await fetch('http://' + host + '/readings?since=' + net.since, { signal:ctl.signal, cache:'no-store' });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    if(net.boot !== null && d.boot !== net.boot){ net.boot = d.boot; net.since = 0; return; }
+    net.boot = d.boot;
+    const out = parsePoll(d, Date.now(), net.since);
+    if(!out.ok) throw new Error('Unexpected reply');
+    for(const e of out.errors) ui.lastErr = e;
+    for(const x of out.readings){ ui.lastErr = null; ingest(x.t, x.k); }
+    net.since = out.maxSeq; net.fails = 0;
+    setConn('good', 'Connected to ' + host); hideNotice();
+    scheduleRender();
+  }catch(e){
+    net.fails++;
+    if(net.fails >= 2) setConn('bad', 'Can’t reach the ESP32');
+    if(net.fails >= 5) showNotice('Still can’t reach ' + host + '. Check that the laptop and ESP32 are on the same Wi-Fi, that the address matches the Serial Monitor, and that the ESP32 is powered.', 'bad');
+    scheduleRender();
+  }finally{ clearTimeout(to); net.busy = false; }
+}
+
+/* ---------- drawing ---------- */
+function cssColors(){
+  const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
+  return { ink:g('--ink'), muted:g('--muted'), line:g('--line'), panel:g('--panel'), accent:g('--accent'), bad:g('--bad'), oob:g('--oob'), ok:g('--ok') };
+}
+function hexA(hex, a){
+  const m = /^#([0-9a-f]{6})$/i.exec(hex); if(!m) return hex;
+  const n = parseInt(m[1], 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function fitCanvas(cv){
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const W = Math.max(10, Math.round(r.width)), H = Math.max(10, Math.round(r.height));
+  if(cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, W, H };
+}
+function niceStep(raw){ const p = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / p; return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p; }
+const X_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 21600, 43200, 86400];
+
+function drawChart(cv, o){
+  if(!cv.offsetParent) return;
+  const { ctx, W, H } = fitCanvas(cv), col = cssColors();
+  const f = UNITS[settings.unit].f, thr = settings.thresholdKpa;
+  const M = { l:50, r:14, t:22, b:28 };
+  const px0 = M.l, px1 = W - M.r, py0 = M.t, py1 = H - M.b, pw = px1 - px0, ph = py1 - py0;
+  const { T, K, t0, t1 } = o;
+  const yMin = -5 * f, yMax = 100 * f;
+  const X = t => px0 + (t - t0) / (t1 - t0) * pw;
+  const Y = v => py1 - (v - yMin) / (yMax - yMin) * ph;
+  cv._g = { px0, pw, t0, t1 };
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = '12px "IBM Plex Sans", system-ui, sans-serif';
+
+  const ys = niceStep((yMax - yMin) / 5);
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
+  for(let v = Math.ceil(yMin / ys) * ys; v <= yMax + 1e-9; v += ys){
+    const y = Y(v);
+    ctx.strokeStyle = col.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px0, y + .5); ctx.lineTo(px1, y + .5); ctx.stroke();
+    ctx.fillStyle = col.muted; ctx.fillText(String(+v.toFixed(2)), px0 - 8, y);
+  }
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = col.muted;
+  ctx.fillText(UNITS[settings.unit].label, 6, 12);
+
+  const spanS = (t1 - t0) / 1000, want = Math.max(3, Math.floor(pw / 90));
+  const step = X_STEPS.find(s => spanS / s <= want) || 86400, stepMs = step * 1000;
+  const offMs = new Date(t0).getTimezoneOffset() * 60000;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  for(let t = Math.ceil((t0 - offMs) / stepMs) * stepMs + offMs; t <= t1; t += stepMs){
+    const x = X(t);
+    ctx.strokeStyle = col.line; ctx.beginPath(); ctx.moveTo(x + .5, py0); ctx.lineTo(x + .5, py1); ctx.stroke();
+    const d = new Date(t);
+    ctx.fillStyle = col.muted;
+    ctx.fillText(step < 60 ? pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()) : pad2(d.getHours()) + ':' + pad2(d.getMinutes()), clamp(x, px0 + 18, px1 - 18), H - 9);
+  }
+
+  if(thr * f > yMin){
+    const yT = Y(Math.min(thr * f, yMax));
+    ctx.fillStyle = hexA(col.bad, .09); ctx.fillRect(px0, yT, pw, py1 - yT);
+    ctx.setLineDash([6, 4]); ctx.strokeStyle = col.bad; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px0, yT); ctx.lineTo(px1, yT); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = col.bad; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('Threshold ' + fmtVal(thr), px1 - 6, yT - 6);
+  }
+
+  const i0 = Math.max(0, lowerBound(T, t0) - 1), i1 = upperBound(T, t1) - 1;
+  if(!T.length || i1 < i0){
+    ctx.fillStyle = col.muted; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(o.emptyMsg || 'No readings in this window yet.', (px0 + px1) / 2, (py0 + py1) / 2);
+  } else {
+    const bucketMs = (t1 - t0) / pw, gapMs = Math.max(GAP_BREAK, bucketMs * 3);
+    const pts = [];
+    if(i1 - i0 + 1 > pw * 2){
+      let bi = i0;
+      while(bi <= i1){
+        const bx = Math.floor((T[bi] - t0) / bucketMs);
+        let mn = Infinity, mx = -Infinity, mnI = bi, mxI = bi, j = bi;
+        while(j <= i1 && Math.floor((T[j] - t0) / bucketMs) === bx){
+          const v = K[j]; if(v < mn){ mn = v; mnI = j; } if(v > mx){ mx = v; mxI = j; } j++;
+        }
+        if(mnI === mxI) pts.push(mnI); else if(mnI < mxI) pts.push(mnI, mxI); else pts.push(mxI, mnI);
+        bi = j;
+      }
+    } else for(let i = i0; i <= i1; i++) pts.push(i);
+
+    ctx.save(); ctx.beginPath(); ctx.rect(px0, py0, pw, ph); ctx.clip();
+    ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    let cur = null, openPath = false;
+    const flush = () => { if(openPath){ ctx.stroke(); openPath = false; } };
+    for(let p = 1; p < pts.length; p++){
+      const a = pts[p - 1], b = pts[p];
+      if(T[b] - T[a] > gapMs){ flush(); continue; }
+      const c = (K[a] < thr || K[b] < thr) ? col.oob : col.accent;
+      if(!openPath || c !== cur){ flush(); ctx.beginPath(); ctx.strokeStyle = c; ctx.moveTo(X(T[a]), Y(K[a] * f)); openPath = true; cur = c; }
+      ctx.lineTo(X(T[b]), Y(K[b] * f));
+    }
+    flush();
+    if(pts.length === 1){ ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(X(T[pts[0]]), Y(K[pts[0]] * f), 3, 0, 7); ctx.fill(); }
+    ctx.restore();
+
+    if(o.showLatest && T[i1] >= t0 && T[i1] <= t1){
+      const lx = X(T[i1]), ly = Y(K[i1] * f), c = K[i1] < thr ? col.oob : col.accent;
+      ctx.fillStyle = hexA(c, .22); ctx.beginPath(); ctx.arc(lx, ly, 8, 0, 7); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 7); ctx.fill();
+    }
+    if(o.hoverT !== null && o.hoverT !== undefined){
+      const hi = nearestIdx(T, o.hoverT);
+      if(hi >= i0 && hi <= i1 && Math.abs(T[hi] - o.hoverT) <= gapMs){
+        const hx = X(T[hi]), hy = Y(K[hi] * f);
+        ctx.strokeStyle = col.muted; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(hx + .5, py0); ctx.lineTo(hx + .5, py1); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = col.panel; ctx.strokeStyle = K[hi] < thr ? col.oob : col.accent; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, 7); ctx.fill(); ctx.stroke();
+      }
+    }
+  }
+  if(o.marks){
+    ctx.lineWidth = 1; ctx.textBaseline = 'alphabetic';
+    for(const m of o.marks){
+      if(m.t < t0 || m.t > t1) continue;
+      const x = X(m.t);
+      ctx.setLineDash([2, 3]); ctx.strokeStyle = m.color; ctx.beginPath(); ctx.moveTo(x + .5, py0); ctx.lineTo(x + .5, py1); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = m.color; ctx.textAlign = m.align;
+      ctx.fillText(m.label, clamp(x + (m.align === 'left' ? 5 : -5), px0 + 4, px1 - 4), py0 + 12);
+    }
+  }
+}
+
+/* ---------- live tab ---------- */
+function windowRange(){
+  const now = Date.now();
+  if(ui.frozen && ui.frozenRange) return ui.frozenRange;
+  if(settings.windowSec === 0){
+    const t0 = S.T.length ? S.T[0] : now - 60000;
+    return { t0:Math.min(t0, now - 60000), t1:now };
+  }
+  return { t0:now - settings.windowSec * 1000, t1:now };
+}
+function renderChart(){
+  const r = windowRange();
+  drawChart($('#chart'), { T:S.T, K:S.K, t0:r.t0, t1:r.t1, showLatest:!ui.frozen, hoverT:ui.hoverT,
+    emptyMsg:S.T.length ? 'No readings in this window.' : 'No readings yet.' });
+}
+function setStatus(state, text, sub){
+  $('#hero').dataset.state = state; $('#statusText').textContent = text; $('#statusSub').textContent = sub || '';
+}
+function renderHero(){
+  const u = UNITS[settings.unit], n = S.T.length, now = Date.now();
+  $('#bigUnit').textContent = u.label;
+  $('#rnote').textContent = u.label + ' below atmospheric pressure. Higher means a stronger vacuum.';
+  const thrTxt = fmtVal(settings.thresholdKpa) + ' ' + u.label;
+  if(!n){
+    $('#bigVal').textContent = '—';
+    const hint = settings.source === 'sim' ? 'Starting the simulator…' : cleanHost(settings.host) ? 'Connecting to the ESP32…' : 'Choose a data source in Settings.';
+    setStatus('wait', 'Waiting for data', hint);
+    $('#stMin').textContent = $('#stMax').textContent = $('#stAvg').textContent = '—';
+    $('#stOob').textContent = '0 s';
+    return;
+  }
+  const last = S.T[n - 1], k = displayK();
+  $('#bigVal').textContent = fmtVal(k);
+  if(ui.lastErr && ui.lastErr.t >= last) setStatus('error', 'Sensor not responding', 'The ESP32 can’t read the pressure sensor. Check the ADS1115 wiring.');
+  else if(now - last > 5000) setStatus('stale', 'No new readings', 'Last reading ' + fmtDur(now - last) + ' ago.');
+  else if(det.open) setStatus('bad', 'Vacuum too weak: possible leak', 'Out of bounds for ' + fmtDur(last - det.open.startT) + '.');
+  else if(!S.armed) setStatus('start', 'Vacuum is building', 'Watching starts once vacuum reaches ' + thrTxt + '.');
+  else if(det.beyondSince !== null) setStatus('warn', 'Vacuum is dipping', 'Below ' + thrTxt + '. Confirming…');
+  else setStatus('good', 'Vacuum is strong', 'Above the ' + thrTxt + ' threshold.');
+  const a = S.agg, withUnit = v => v === null || !Number.isFinite(v) ? '—' : fmtVal(v) + '<small>' + u.label + '</small>';
+  $('#stMin').innerHTML = withUnit(a.min);
+  $('#stMax').innerHTML = withUnit(a.max);
+  $('#stAvg').innerHTML = a.n ? withUnit(a.sum / a.n) : '—';
+  $('#stOob').textContent = fmtDur(oobMs());
+}
+function renderLegend(){
+  $('#legend').innerHTML = '<span><i></i>Vacuum strength</span><span><i class="o"></i>Out of bounds</span><span><i class="d"></i>Threshold</span><span><i class="z"></i>Problem zone</span>';
+}
+function renderAll(){
+  renderHero(); renderChart(); updateBadge();
+  if(ui.tab === 'events') renderEvents();
+}
+function scheduleRender(){
+  if(ui.raf) return; ui.raf = true;
+  requestAnimationFrame(() => { ui.raf = false; renderHero(); if(ui.tab === 'live') renderChart(); tickEvents(); });
+}
+
+/* ---------- events tab ---------- */
+function updateBadge(){
+  const b = $('#evBadge'), n = S.events.length;
+  b.hidden = !n; b.textContent = n;
+}
+function statusCell(e){ return e.endT === null ? '<span class="state-on">Ongoing</span>' : '<span class="state-off">Ended</span>'; }
+function evDuration(e){ const end = e.endT === null ? (lastT() === null ? e.startT : lastT()) : e.endT; return fmtDur(end - e.startT); }
+
+function renderEvents(){
+  const tbl = $('#evTable'), empty = $('#evEmpty');
+  const u = UNITS[settings.unit].label;
+  const n = S.events.length, open = S.events.filter(e => e.endT === null).length;
+  $('#evSum').textContent = n
+    ? n + (n === 1 ? ' event' : ' events') + (open ? ', 1 ongoing' : '') + '. Total time out of bounds: ' + fmtDur(oobMs()) + '.'
+    : 'No events yet';
+  if(!n){
+    tbl.innerHTML = ''; empty.hidden = false;
+    empty.textContent = 'An event is recorded when vacuum strength stays below ' + fmtVal(settings.thresholdKpa) + ' ' + u + ' for ' + settings.startDelay + ' seconds. '
+      + (settings.source === 'sim' ? 'Try “Simulate a leak” on the Live tab.' : 'Vent the line or pinch the tubing to see one.');
+    return;
+  }
+  empty.hidden = true;
+  const ae = document.activeElement;
+  const keep = (ae && tbl.contains(ae) && ae.closest('[data-form]'))
+    ? { form:ae.closest('[data-form]').dataset.form, name:ae.name, s:ae.selectionStart, e:ae.selectionEnd } : null;
+  let h = '<thead><tr><th>Event</th><th>Started</th><th>Duration</th><th>Lowest vacuum</th><th>Status</th><th>Notes</th></tr></thead><tbody>';
+  for(const e of S.events.slice().reverse()){
+    const ex = ui.expanded.has(e.id);
+    h += '<tr data-row="' + e.id + '"><td><button class="rowbtn" data-toggle="' + e.id + '" aria-expanded="' + ex + '"><span class="car">&#9656;</span>Event ' + e.no + '</button></td>'
+      + '<td>' + fmtStamp(e.startT) + '</td><td data-dur="' + e.id + '">' + evDuration(e) + '</td>'
+      + '<td data-min="' + e.id + '">' + fmtVal(e.minK) + ' ' + u + '</td><td data-st="' + e.id + '">' + statusCell(e) + '</td>'
+      + '<td>' + e.notes.length + '</td></tr>';
+    if(ex){
+      h += '<tr class="detail"><td colspan="6"><div class="dgrid"><div><h4>What the graph showed</h4><canvas class="mini" data-mini="' + e.id + '"></canvas></div>'
+        + '<div><h4>Engineer notes</h4><div class="notes">' + (e.notes.length ? e.notes.slice().reverse().map(n =>
+          '<div class="note"><div class="meta"><span>' + esc(n.author || 'Engineer') + (n.ts ? ', ' + fmtStamp(n.ts) : '') + '</span><button data-delnote="' + e.id + '|' + esc(n.id) + '">Delete</button></div><div class="body">' + esc(n.text) + '</div></div>').join('')
+          : '<div class="empty" style="padding:10px;text-align:left">No notes yet. Write what happened and how it was fixed, so the next person can find it.</div>')
+        + '</div><form class="noteform" data-form="' + e.id + '"><input type="text" name="author" placeholder="Your name" maxlength="80" value="' + esc((ui.drafts[e.id] && ui.drafts[e.id].author) || settings.author) + '">'
+        + '<textarea name="text" placeholder="What happened, and how did you fix it?" maxlength="2000">' + esc((ui.drafts[e.id] && ui.drafts[e.id].text) || '') + '</textarea>'
+        + '<div><button class="btn small primary" type="submit">Add note</button></div></form></div></div></td></tr>';
+    }
+  }
+  tbl.innerHTML = h + '</tbody>';
+  if(keep){
+    const f = $('[data-form="' + keep.form + '"]');
+    const el = f && f.elements[keep.name];
+    if(el){ el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch(err){} }
+  }
+  drawMinis();
+}
+function drawMinis(){
+  for(const id of ui.expanded){
+    const e = S.events.find(x => x.id === id); if(!e) continue;
+    const cv = $('[data-mini="' + id + '"]'); if(!cv) continue;
+    const T = e.trace.map(p => p[0]), K = e.trace.map(p => p[1]);
+    if(!T.length) continue;
+    const t0 = Math.min(T[0], e.startT - 5000), t1 = Math.max(T[T.length - 1], (e.endT === null ? T[T.length - 1] : e.endT) + 5000, t0 + 20000);
+    const col = cssColors(), marks = [{ t:e.startT, label:'Out of bounds', color:col.oob, align:'right' }];
+    if(e.endT !== null) marks.push({ t:e.endT, label:'Back in bounds', color:col.ok, align:'left' });
+    drawChart(cv, { T, K, t0, t1, marks, showLatest:e.endT === null });
+  }
+}
+function tickEvents(){
+  if(ui.tab !== 'events') return;
+  for(const e of S.events){
+    const d = $('[data-dur="' + e.id + '"]'); if(d) d.textContent = evDuration(e);
+    const m = $('[data-min="' + e.id + '"]'); if(m) m.textContent = fmtVal(e.minK) + ' ' + UNITS[settings.unit].label;
+    const s = $('[data-st="' + e.id + '"]'); if(s) s.innerHTML = statusCell(e);
+  }
+  $('#evSum').textContent = S.events.length
+    ? S.events.length + (S.events.length === 1 ? ' event' : ' events') + (S.events.some(e => e.endT === null) ? ', 1 ongoing' : '') + '. Total time out of bounds: ' + fmtDur(oobMs()) + '.'
+    : 'No events yet';
+  drawMinis();
+}
+
+function copyText(text){
+  if(navigator.clipboard && window.isSecureContext !== false){ return navigator.clipboard.writeText(text); }
+  return new Promise((res, rej) => {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy') ? res() : rej(); }catch(e){ rej(e); } ta.remove();
+  });
+}
+
+/* ---------- settings dialog ---------- */
+const dlg = $('#settings');
+let dlgUnit = 'kPa';
+function fillDialog(s){
+  $('#sSource').value = s.source; $('#sHost').value = s.host; $('#hostField').hidden = s.source !== 'wifi';
+  dlgUnit = s.unit; $('#sUnit').value = s.unit; $('#thrUnit').textContent = UNITS[s.unit].label;
+  $('#sThr').value = +(s.thresholdKpa * UNITS[s.unit].f).toFixed(2);
+  $('#sStart').value = s.startDelay; $('#sEnd').value = s.endDelay; $('#sWait').checked = s.waitForGood;
+  $('#sSmooth').value = String(s.smoothing); $('#sKeep').value = String(s.keepSec); $('#sTheme').value = s.theme;
+}
+function openSettings(){ fillDialog(settings); dlg.showModal(); }
+function applySettings(){
+  const unit = $('#sUnit').value, thr = parseFloat($('#sThr').value) / UNITS[unit].f;
+  if(!Number.isFinite(thr) || thr <= 0 || thr > 100){ toast('Enter a threshold between 0 and ' + fmtVal(100, unit) + ' ' + UNITS[unit].label + '.'); return; }
+  const num = (id, lo, hi, d) => { const v = parseInt($(id).value, 10); return Number.isFinite(v) ? clamp(v, lo, hi) : d; };
+  const prev = Object.assign({}, settings);
+  settings.source = $('#sSource').value; settings.host = $('#sHost').value.trim();
+  if(settings.source === 'wifi' && settings.host && !cleanHost(settings.host)){ toast('That address doesn’t look right. Use something like 192.168.1.42 or vacuum.local.'); Object.assign(settings, prev); return; }
+  settings.unit = unit; settings.thresholdKpa = thr;
+  settings.startDelay = num('#sStart', 0, 60, 2); settings.endDelay = num('#sEnd', 0, 60, 2);
+  settings.waitForGood = $('#sWait').checked; settings.smoothing = parseInt($('#sSmooth').value, 10);
+  settings.keepSec = parseInt($('#sKeep').value, 10); settings.theme = $('#sTheme').value;
+  saveSettings(); applyTheme(); trimReadings();
+  dlg.close();
+  if(prev.source !== settings.source || cleanHost(prev.host) !== cleanHost(settings.host)) startSource();
+  renderAll(); renderLegend();
+}
+
+/* ---------- wiring ---------- */
+function switchTab(name){
+  ui.tab = name;
+  for(const t of ['live', 'events']){
+    $('#tab-' + t).hidden = t !== name;
+    $('#t-' + t).setAttribute('aria-selected', String(t === name));
+  }
+  if(name === 'events') renderEvents(); else renderChart();
+}
+function init(){
+  settings = loadSettings(); applyTheme();
+  restoreSession();
+  renderLegend();
+  $$('#winSeg input').forEach(r => { r.checked = Number(r.value) === settings.windowSec; });
+
+  $('#t-live').addEventListener('click', () => switchTab('live'));
+  $('#t-events').addEventListener('click', () => switchTab('events'));
+  $('#tab-live').parentElement.querySelector('.tabs').addEventListener('keydown', e => {
+    if(e.key === 'ArrowRight' || e.key === 'ArrowLeft'){ const to = ui.tab === 'live' ? 'events' : 'live'; switchTab(to); $('#t-' + to).focus(); }
+  });
+  $('#winSeg').addEventListener('change', e => {
+    settings.windowSec = Number(e.target.value); saveSettings();
+    if(ui.frozen){ ui.frozen = false; ui.frozenRange = null; $('#freezeBtn').setAttribute('aria-pressed', 'false'); $('#freezeBtn').textContent = 'Freeze graph'; }
+    renderChart();
+  });
+  $('#freezeBtn').addEventListener('click', () => {
+    ui.frozen = !ui.frozen;
+    if(ui.frozen){ const r = windowRange(); ui.frozenRange = { t0:r.t0, t1:r.t1 }; } else ui.frozenRange = null;
+    const b = $('#freezeBtn'); b.setAttribute('aria-pressed', String(ui.frozen)); b.textContent = ui.frozen ? 'Resume graph' : 'Freeze graph';
+    renderChart();
+  });
+  $('#simLeak').addEventListener('click', () => { simLeak(15, Date.now()); toast('Simulating a leak for about 15 seconds'); });
+
+  const cv = $('#chart'), tip = $('#tip');
+  cv.addEventListener('pointermove', e => {
+    const g = cv._g; if(!g) return;
+    const rect = cv.getBoundingClientRect(), x = e.clientX - rect.left;
+    if(x < g.px0 || x > g.px0 + g.pw || !S.T.length){ ui.hoverT = null; tip.hidden = true; renderChart(); return; }
+    const t = g.t0 + (x - g.px0) / g.pw * (g.t1 - g.t0), i = nearestIdx(S.T, t);
+    const near = Math.max(GAP_BREAK, (g.t1 - g.t0) / g.pw * 4);
+    if(i < 0 || Math.abs(S.T[i] - t) > near){ ui.hoverT = null; tip.hidden = true; renderChart(); return; }
+    ui.hoverT = t;
+    const k = S.K[i], badv = k < settings.thresholdKpa;
+    tip.innerHTML = '<b>' + fmtClock(S.T[i]) + '</b><br>' + fmtVal(k) + ' ' + UNITS[settings.unit].label + '<br><span class="chip' + (badv ? ' bad' : '') + '">' + (badv ? 'Out of bounds' : 'In bounds') + '</span>';
+    tip.hidden = false;
+    const wrap = $('#chartWrap').getBoundingClientRect(), tw = tip.offsetWidth;
+    let left = e.clientX - wrap.left + 14; if(left + tw > wrap.width - 4) left = e.clientX - wrap.left - tw - 14;
+    tip.style.left = Math.max(4, left) + 'px'; tip.style.top = Math.max(4, e.clientY - wrap.top - 50) + 'px';
+    renderChart();
+  });
+  cv.addEventListener('pointerleave', () => { ui.hoverT = null; tip.hidden = true; renderChart(); });
+
+  $('#saveBtn').addEventListener('click', downloadSession);
+  $('#loadBtn').addEventListener('click', () => $('#fileIn').click());
+  $('#fileIn').addEventListener('change', e => { const f = e.target.files[0]; if(f) loadSessionFile(f); e.target.value = ''; });
+  $('#newBtn').addEventListener('click', newSession);
+  $('#openSettings').addEventListener('click', openSettings);
+  $('#setClose').addEventListener('click', () => dlg.close());
+  $('#setCancel').addEventListener('click', () => dlg.close());
+  $('#setApply').addEventListener('click', applySettings);
+  $('#setReset').addEventListener('click', () => fillDialog(Object.assign({}, DEFAULTS, { author:settings.author })));
+  $('#sSource').addEventListener('change', e => { $('#hostField').hidden = e.target.value !== 'wifi'; });
+  $('#sUnit').addEventListener('change', e => {
+    const v = parseFloat($('#sThr').value), nu = e.target.value;
+    if(Number.isFinite(v)) $('#sThr').value = +(v / UNITS[dlgUnit].f * UNITS[nu].f).toFixed(2);
+    dlgUnit = nu; $('#thrUnit').textContent = UNITS[nu].label;
+  });
+
+  $('#copyCsv').addEventListener('click', () => {
+    if(!S.events.length){ toast('There are no events to copy yet.'); return; }
+    copyText(eventsCsv()).then(() => toast('Copied ' + S.events.length + (S.events.length === 1 ? ' event' : ' events') + ' as CSV'), () => toast('Copy was blocked by the browser.'));
+  });
+  const evTable = $('#evTable');
+  evTable.addEventListener('click', e => {
+    const tg = e.target.closest('[data-toggle]');
+    if(tg){ const id = tg.dataset.toggle; ui.expanded.has(id) ? ui.expanded.delete(id) : ui.expanded.add(id); renderEvents(); return; }
+    const dn = e.target.closest('[data-delnote]');
+    if(dn){
+      const [eid, nid] = dn.dataset.delnote.split('|'), ev = S.events.find(x => x.id === eid);
+      if(ev && confirm('Delete this note?')){ ev.notes = ev.notes.filter(n => n.id !== nid); saveSession(); renderEvents(); }
+    }
+  });
+  evTable.addEventListener('input', e => {
+    const f = e.target.closest('[data-form]'); if(!f) return;
+    ui.drafts[f.dataset.form] = { author:f.elements.author.value, text:f.elements.text.value };
+  });
+  evTable.addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.target.closest('[data-form]'); if(!f) return;
+    const ev = S.events.find(x => x.id === f.dataset.form), text = f.elements.text.value.trim();
+    if(!ev) return;
+    if(!text){ toast('Write a short note first.'); f.elements.text.focus(); return; }
+    settings.author = f.elements.author.value.trim().slice(0, 80); saveSettings();
+    ev.notes.push({ id:Date.now().toString(36) + Math.random().toString(36).slice(2, 6), author:settings.author, text, ts:Date.now() });
+    delete ui.drafts[ev.id]; saveSession(); renderEvents(); toast('Note added');
+  });
+
+  window.addEventListener('pagehide', () => { if(dirty) saveSession(); });
+  document.addEventListener('visibilitychange', () => { if(document.hidden && dirty) saveSession(); });
+  setInterval(() => { if(dirty) saveSession(); }, 10000);
+  setInterval(scheduleRender, 1000);
+  if('ResizeObserver' in window) new ResizeObserver(() => { renderChart(); if(ui.tab === 'events') drawMinis(); }).observe($('#chartWrap'));
+  window.addEventListener('resize', () => { renderChart(); if(ui.tab === 'events') drawMinis(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderAll());
+
+  renderAll();
+  startSource();
+}
+init();
+</script>
+</body>
+</html>
